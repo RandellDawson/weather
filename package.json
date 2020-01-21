@@ -1,0 +1,41 @@
+{
+  "name": "weather",
+  "version": "1.0.0",
+  "description": "Randy's Weather App",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack",
+    "dev": "cross-env WEBPACK_ENV=dev webpack-dev-server",
+    "prestart": "npm run build",
+    "start": "http-server dist --port 8080",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.7.7",
+    "autoprefixer-loader": "^3.1.0",
+    "babel-loader": "^8.0.6",
+    "clean-webpack-plugin": "^3.0.0",
+    "cross-env": "^6.0.3",
+    "css-loader": "^3.4.1",
+    "exports-loader": "^0.6.2",
+    "html-webpack-plugin": "^3.2.0",
+    "http-server": "^0.12.0",
+    "mini-css-extract-plugin": "^0.9.0",
+    "optimize-css-assets-webpack-plugin": "^5.0.3",
+    "source-map-loader": "^0.1.5",
+    "style-loader": "^0.12.4",
+    "webpack": "^4.41.5",
+    "webpack-cli": "^3.3.10",
+    "webpack-dev-server": "^3.10.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RandellDawson/weather.git"
+  },
+  "author": "Randell Dawson",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/RandellDawson/weather/issues"
+  },
+  "homepage": "https://github.com/RandellDawson/weather#readme"
+}
