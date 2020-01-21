@@ -7,7 +7,7 @@ h1 {
   font-size: 30px;
 }
 
-#app {
+.app {
   display: none;
   background-color: #ccccc0;
   opacity: 0.8;
@@ -60,4 +60,8 @@ h1 {
 
 #degree-unit:hover {
   color: #4169E1;
+}
+
+.show {
+  display: block;
 }
