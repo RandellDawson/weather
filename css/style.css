@@ -1,0 +1,63 @@
+html,
+body {
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 30px;
+}
+
+#app {
+  display: none;
+  background-color: #ccccc0;
+  opacity: 0.8;
+  max-width: 50vw;
+  border-radius: 10px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  text-align: center;
+  min-width: 300px;
+  min-height: 300px;
+  margin-left: -150px;
+  margin-top: -150px;
+  border: 1px solid #000000;
+}
+
+#weather-info {
+  position: relative;
+  width: 95%;
+  margin: 0 auto;
+}
+
+#weather-info div {
+  margin: 15px auto;
+}
+
+#weather-info #weather-description {
+  font-size: 20px;
+  margin: 0;
+}
+
+#weather-info #icon {
+  width: 35%;
+  height: 35%;
+  border: 0;
+}
+
+#weather-info #temp-value {
+  font-size: 35px;
+  font-weight: 900;
+}
+
+#degree-unit {
+  color: blue;
+  cursor: pointer;
+  font-size: 25px;
+  text-decoration: none;
+  vertical-align: top;
+}
+
+#degree-unit:hover {
+  color: #4169E1;
+}
