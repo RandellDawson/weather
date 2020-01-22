@@ -52,8 +52,10 @@ function runApp() {
     elems.title.innerHTML = name;
     const [{ main: weatherDescription, icon, description } ] = weather;
     elems.weatherDesc.innerHTML =  weatherDescription;
-    elems.icon.setAttribute('src', icon);
-    elems.icon.setAttribute('alt', description);
+    if (icon) {
+      elems.icon.setAttribute('src', icon);
+      elems.icon.setAttribute('alt', description);
+    }
     elems.tempValue.setAttribute('data-celcius', temp);
     toggleTemp(country === "US" ? "C" : "F");
     elems.app.classList.add('show');
