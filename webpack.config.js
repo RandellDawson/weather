@@ -4,16 +4,20 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
+const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 
 module.exports = {
   entry: './src/index.js',
-
+  mode: process.env.NODE_ENV || 'production',
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.js'
+    filename: 'bundle.js',
   },
   optimization: {
-    minimizer: [new OptimizeCSSAssetsPlugin({})],
+    minimizer: [
+      new OptimizeCSSAssetsPlugin({}),
+      new UglifyJsPlugin()
+    ],
   },
 
   module: {
@@ -21,7 +25,24 @@ module.exports = {
       {
         test: /\.js$/,
         exclude: /node_modules/,
-        use: ['babel-loader']
+        use: {
+          loader: 'babel-loader',
+          options: {
+            "presets": [
+              [
+                "@babel/preset-env",
+                { 
+                  "modules": false,
+                  "useBuiltIns": "usage",
+                  "corejs": 2,
+                  "targets": {
+                    "browsers": [">0.25%", "not dead", "ie >= 11"]
+                  }
+                }
+              ]
+            ]
+          }
+        }
       },
       // bundle CSS into a single CSS file, auto-generating -vendor-prefixes
       {
@@ -57,7 +78,7 @@ module.exports = {
   stats: { colors: true },
 
   // Generate external sourcemaps for the JS & CSS bundles
-  devtool: 'source-map',
+  // devtool: process.env.NODE_ENV === 'production' ? '(none)' : 'source-map',
 
   // `webpack-dev-server` spawns a live-reloading HTTP server for your project.
   devServer: {

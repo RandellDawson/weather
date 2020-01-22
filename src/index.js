@@ -1,3 +1,8 @@
+import './style.css';
+import "core-js/modules/es6.promise";
+import "core-js/modules/es6.array.iterator";
+import 'whatwg-fetch';
+
 function runApp() {
   function getLocation() {
     if (navigator.geolocation) {
