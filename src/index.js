@@ -36,7 +36,7 @@ function runApp() {
     if (data.constructor.name.includes('Position')) {
       data = data.coords;
     }
-    const baseUrl = "https://apis.randydawson.com/weather/current?";
+    const baseUrl = "https://apis.randelldawson.com/weather/current?";
     const geoCoordsQS = 'lat=' + data.latitude + '&lon=' + data.longitude;
     fetch(baseUrl + geoCoordsQS)
       .then(checkResponse)
