@@ -25,7 +25,7 @@ test('serves original-looking website and health check', async () => withServer(
 }));
 
 test('blocks cross-origin API calls', async () => withServer(async base => {
-  for (const path of ['/current?lat=37&lon=-113', '/location']) {
+  for (const path of ['/current?lat=37&lon=-113']) {
     const resp = await fetch(base + path, { headers: { Origin: 'https://evil.example' } });
     assert.equal(resp.status, 403);
     const crossSite = await fetch(base + path, { headers: { 'Sec-Fetch-Site': 'cross-site' } });
@@ -38,4 +38,13 @@ test('rejects invalid weather coordinates', async () => withServer(async base =>
     headers: { Origin: 'http://localhost:3000' }
   });
   assert.equal(resp.status, 400);
+}));
+
+test('does not expose an IP geolocation endpoint or frontend fallback', async () => withServer(async base => {
+  const location = await fetch(base + '/location');
+  assert.equal(location.status, 404);
+  const script = await fetch(base + '/index.js');
+  const source = await script.text();
+  assert.doesNotMatch(source, /getLocationByIP|fetch\(['"]\/location/);
+  assert.match(source, /navigator\.geolocation\.getCurrentPosition/);
 }));
