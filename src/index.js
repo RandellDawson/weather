@@ -17,9 +17,6 @@ function runApp() {
     return response.json();
   }
 
-  async function getLocationByIP() {
-    return checkResponse(await fetch('/location'));
-  }
 
   async function getWeather(location) {
     const coords = location.coords || location;
@@ -62,26 +59,31 @@ function runApp() {
   });
 
   async function start() {
-    try {
-      let location;
-      if (navigator.geolocation) {
-        try {
-          location = await new Promise((resolve, reject) =>
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 })
-          );
-        } catch {
-          location = await getLocationByIP();
-        }
-      } else {
-        location = await getLocationByIP();
-      }
-      await getWeather(location);
-    } catch (error) {
-      console.error('Weather unavailable:', error);
-      elems.title.textContent = 'Weather unavailable';
-      elems.weatherDesc.textContent = 'Please try again later.';
+    if (!navigator.geolocation) {
+      elems.title.textContent = 'Location unavailable';
+      elems.weatherDesc.textContent = 'Your browser does not support location access.';
       elems.app.classList.add('show');
+      return;
     }
+    navigator.geolocation.getCurrentPosition(
+      async location => {
+        try {
+          await getWeather(location);
+        } catch (error) {
+          console.error('Weather unavailable:', error);
+          elems.title.textContent = 'Weather unavailable';
+          elems.weatherDesc.textContent = 'Please try again later.';
+          elems.app.classList.add('show');
+        }
+      },
+      error => {
+        console.error('Location unavailable:', error);
+        elems.title.textContent = 'Location unavailable';
+        elems.weatherDesc.textContent = 'Allow location access in your browser and reload this page.';
+        elems.app.classList.add('show');
+      },
+      { timeout: 8000 }
+    );
   }
 
   start();
