@@ -1,48 +1,24 @@
 {
   "name": "weather",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "private": true,
   "description": "Randy's Weather App",
-  "main": "index.js",
-  "scripts": {
-    "build": "webpack",
-    "dev": "cross-env WEBPACK_ENV=dev webpack-dev-server",
-    "prestart": "npm run build",
-    "start": "http-server dist --port 8080",
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "engines": {
+    "node": ">=24 <25"
   },
-  "devDependencies": {
-    "@babel/core": "^7.14.3",
-    "@babel/preset-env": "^7.14.4",
-    "babel-loader": "^8.2.2",
-    "clean-webpack-plugin": "^3.0.0",
-    "cross-env": "^6.0.3",
-    "css-loader": "^3.6.0",
-    "exports-loader": "^0.6.2",
-    "html-webpack-plugin": "^3.2.0",
-    "http-server": "^0.12.3",
-    "mini-css-extract-plugin": "^0.9.0",
-    "postcss-loader": "^3.0.0",
-    "postcss-preset-env": "^6.7.0",
-    "source-map-loader": "^0.1.5",
-    "style-loader": "^0.12.4",
-    "uglifyjs-webpack-plugin": "^2.2.0",
-    "webpack": "^4.46.0",
-    "webpack-cli": "^3.3.12",
-    "webpack-dev-server": "^3.11.2"
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "express-rate-limit": "^8.2.1"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/RandellDawson/weather.git"
   },
-  "author": "Randell Dawson",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/RandellDawson/weather/issues"
-  },
-  "homepage": "https://github.com/RandellDawson/weather#readme",
-  "dependencies": {
-    "core-js": "^2.6.12",
-    "optimize-css-assets-webpack-plugin": "^5.0.6",
-    "whatwg-fetch": "^3.6.2"
-  }
+  "license": "MIT"
 }

@@ -1,75 +1,6 @@
-import './style.css';
-import "core-js/modules/es6.promise";
-import "core-js/modules/es6.array.iterator";
-import 'whatwg-fetch';
+'use strict';
 
 function runApp() {
-  function getLocation() {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(getWeather, getLocationByIP);
-    } else {
-      getLocationByIP();
-    }
-  };
-
-  function checkResponse(response) {
-    if (response.ok) {
-      return response.json();
-    } else {
-      const error = {
-        'statusText': response.statusText,
-        'status': response.status
-      }
-      throw error;
-    }
-  }
-
-  function getLocationByIP() {
-    const baseUrl = 'https://api.ipgeolocation.io/ipgeo?apiKey=';
-    const apiKey = '10d6a9d7232c4e4187c783281e3f82d2';
-    fetch(baseUrl + apiKey)
-      .then(checkResponse)
-      .then(getWeather);
-  };
-
-  function getWeather(data) {
-    if (data.constructor.name.includes('Position')) {
-      data = data.coords;
-    }
-    const baseUrl = "https://apis.randelldawson.com/weather/current?";
-    const geoCoordsQS = 'lat=' + data.latitude + '&lon=' + data.longitude;
-    fetch(baseUrl + geoCoordsQS)
-      .then(checkResponse)
-      .then(updateWeather);
-  };
-
-  function updateWeather({
-      sys: { country },
-      name,
-      weather,
-      main: { temp }
-    }) {
-    elems.title.innerHTML = name;
-    const [{ main: weatherDescription, icon, description } ] = weather;
-    elems.weatherDesc.innerHTML =  weatherDescription;
-    if (icon) {
-      elems.icon.setAttribute('src', icon);
-      elems.icon.setAttribute('alt', description);
-    }
-    elems.tempValue.setAttribute('data-celcius', temp);
-    toggleTemp(country === "US" ? "C" : "F");
-    elems.app.classList.add('show');
-  };
-
-  function toggleTemp(unit) {
-    const celcius = +elems.tempValue.getAttribute('data-celcius');
-    unit = elems.degreeUnit.innerHTML.slice(-1) || unit;
-    elems.tempValue.innerText = (
-      unit === "C" ? Math.round(celcius * 9 / 5 + 32) : celcius.toFixed(1)
-    );
-    elems.degreeUnit.innerHTML = "&#176;" + (unit === "C" ? "F" : "C");
-  };
-  
   const elems = {
     app: document.querySelector('.app'),
     degreeUnit: document.getElementById('degree-unit'),
@@ -78,9 +9,81 @@ function runApp() {
     icon: document.getElementById('icon'),
     tempValue: document.getElementById('temp-value')
   };
+  let celsius = null;
+  let currentUnit = 'C';
 
-  getLocation();
-  elems.degreeUnit.addEventListener('click', toggleTemp);
+  async function checkResponse(response) {
+    if (!response.ok) throw new Error('Request failed (' + response.status + ')');
+    return response.json();
+  }
+
+  async function getLocationByIP() {
+    return checkResponse(await fetch('/location'));
+  }
+
+  async function getWeather(location) {
+    const coords = location.coords || location;
+    const params = new URLSearchParams({
+      lat: coords.latitude,
+      lon: coords.longitude
+    });
+    const data = await checkResponse(await fetch('/current?' + params));
+    updateWeather(data);
+  }
+
+  function updateWeather(data) {
+    const item = data.weather && data.weather[0];
+    if (!item || !data.main || !Number.isFinite(Number(data.main.temp))) {
+      throw new Error('Unexpected weather response');
+    }
+    elems.title.textContent = data.name || 'Local weather';
+    elems.weatherDesc.textContent = item.main || '';
+    if (item.icon) {
+      elems.icon.src = item.icon;
+      elems.icon.alt = item.description || '';
+    }
+    celsius = Number(data.main.temp);
+    currentUnit = data.sys && data.sys.country === 'US' ? 'F' : 'C';
+    renderTemperature();
+    elems.app.classList.add('show');
+  }
+
+  function renderTemperature() {
+    if (celsius === null) return;
+    elems.tempValue.textContent = currentUnit === 'F'
+      ? String(Math.round(celsius * 9 / 5 + 32))
+      : celsius.toFixed(1);
+    elems.degreeUnit.textContent = '°' + currentUnit;
+  }
+
+  elems.degreeUnit.addEventListener('click', () => {
+    currentUnit = currentUnit === 'F' ? 'C' : 'F';
+    renderTemperature();
+  });
+
+  async function start() {
+    try {
+      let location;
+      if (navigator.geolocation) {
+        try {
+          location = await new Promise((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 })
+          );
+        } catch {
+          location = await getLocationByIP();
+        }
+      } else {
+        location = await getLocationByIP();
+      }
+      await getWeather(location);
+    } catch (error) {
+      console.error('Weather unavailable:', error);
+      elems.title.textContent = 'Weather unavailable';
+      elems.weatherDesc.textContent = 'Please try again later.';
+      elems.app.classList.add('show');
+    }
+  }
+
+  start();
 }
-
-document.addEventListener("DOMContentLoaded", runApp);
+document.addEventListener('DOMContentLoaded', runApp);
