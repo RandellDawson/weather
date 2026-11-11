@@ -10,7 +10,7 @@ const trustProxy = Number(process.env.TRUST_PROXY || 0);
 if (trustProxy !== 0 && trustProxy !== 1) {
   throw new Error('TRUST_PROXY must be 0 or 1');
 }
-if (trustProxy === 1) app.set('trust proxy', 'loopback');
+if (trustProxy === 1) app.set('trust proxy', 1);
 
 app.use(['/current', '/location'], restrictOrigin, apiLimiter);
 
