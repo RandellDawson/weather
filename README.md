@@ -10,7 +10,7 @@ The original design remains in `src/index.html` and `src/style.css`, served as s
 nvm use
 npm install
 cp .env.example .env
-# Add OPENWEATHER_API_KEY and IPGEO_API_KEY to .env, without committing secrets.
+# Add OPENWEATHER_API_KEY to .env, without committing secrets.
 npm test
 npm start
 ```
@@ -21,17 +21,16 @@ Open http://localhost:3000. The server listens on `127.0.0.1` only.
 
 - `/`: weather webpage
 - `/current?lat=37.1&lon=-113.5`: OpenWeather-compatible JSON
-- `/location`: server-side IP geolocation fallback
 - `/health`: basic health check
 
-Browser geolocation is preferred. If the browser denies location access or cannot determine location, the server-side `/location` fallback uses IPGeolocation.io and requires `IPGEO_API_KEY`. This key was previously exposed in the legacy frontend; create a fresh key rather than reusing an exposed one. The OpenWeather endpoint is configured in the server code and needs no `API_URL` setting.
+The site uses browser geolocation only. Visitors must allow location access to receive local weather. The OpenWeather endpoint is configured in the server code and needs no `API_URL` setting.
 
 ## Security
 
 - CORS access isn't opened to other origins. Cross-origin browser requests with disallowed Origin, Referer, or Sec-Fetch-Site headers are rejected.
 - These checks are *not* authentication. HTTP clients can forge or omit headers. Public API endpoints are still callable from scripts.
-- Shared rate limiting: 60 requests per 15 minutes per client IP across `/current` and `/location`. Single-process in-memory limiter; upgrade to shared storage if scaling to multiple workers.
-- Keep upstream weather and geolocation keys in .env; rotate the previously exposed geolocation API key.
+- Shared rate limiting: 60 requests per 15 minutes per client IP for `/current`. Single-process in-memory limiter; upgrade to shared storage if scaling to multiple workers.
+- Keep the OpenWeather key in `.env`. No IP geolocation account or key is required.
 - The application only binds localhost. Put Nginx HTTPS in front of it, and do not expose the Node port.
 - `TRUST_PROXY=1` only with trusted local Nginx forwarding client IP, e.g. `proxy_set_header X-Forwarded-For $remote_addr;`; ensure direct access to the Node port is blocked. No broad untrusted proxy setting.
 - For stronger prevention of automated extraction, use proxy-level WAF / bot control or authentication. A public anonymous website cannot absolutely prevent scraping.
