@@ -25,13 +25,15 @@ async function getWeather(req, res) {
     return res.status(400).json({ error: 'lat and lon must be valid coordinates' });
   }
 
-  const { API_URL, API_KEY } = process.env;
-  if (!API_URL || !API_KEY) {
+  const { OPENWEATHER_API_KEY } = process.env;
+  if (!OPENWEATHER_API_KEY) {
     return res.status(503).json({ error: 'Weather service is not configured' });
   }
 
   try {
-    const url = new URL(API_URL + API_KEY);
+    const url = new URL('https://api.openweathermap.org/data/2.5/weather');
+    url.searchParams.set('appid', OPENWEATHER_API_KEY);
+    url.searchParams.set('units', 'metric');
     url.searchParams.set('lat', String(Number(lat)));
     url.searchParams.set('lon', String(Number(lon)));
     const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
