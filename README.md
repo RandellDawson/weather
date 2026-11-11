@@ -10,7 +10,7 @@ The original design remains in `src/index.html` and `src/style.css`, served as s
 nvm use
 npm install
 cp .env.example .env
-# Add API_URL, API_KEY and IPGEO_API_KEY to .env, without committing secrets.
+# Add OPENWEATHER_API_KEY and IPGEO_API_KEY to .env, without committing secrets.
 npm test
 npm start
 ```
@@ -24,7 +24,7 @@ Open http://localhost:3000. The server listens on `127.0.0.1` only.
 - `/location`: server-side IP geolocation fallback
 - `/health`: basic health check
 
-Browser geolocation is preferred. The fallback uses IP geolocation if enabled.
+Browser geolocation is preferred. If the browser denies location access or cannot determine location, the server-side `/location` fallback uses IPGeolocation.io and requires `IPGEO_API_KEY`. This key was previously exposed in the legacy frontend; create a fresh key rather than reusing an exposed one. The OpenWeather endpoint is configured in the server code and needs no `API_URL` setting.
 
 ## Security
 
