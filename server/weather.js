@@ -1,5 +1,3 @@
-const imgLinks = require('./weather-icons.json');
-
 function validateCoords(lat, lon) {
   if (typeof lat !== 'string' || typeof lon !== 'string' ||
       !lat.trim() || !lon.trim()) return false;
@@ -14,7 +12,9 @@ function normalizeWeather(data) {
     ...data,
     weather: data.weather.map(item => ({
       ...item,
-      icon: imgLinks[item.icon] || item.icon
+      icon: typeof item.icon === 'string' && /^(?:01|02|03|04|09|10|11|13|50)[dn]$/.test(item.icon)
+        ? `https://openweathermap.org/img/wn/${item.icon}@2x.png`
+        : item.icon
     }))
   };
 }
