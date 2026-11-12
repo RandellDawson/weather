@@ -11,11 +11,21 @@ test('validates latitude and longitude', () => {
   }
 });
 
-test('preserves weather structure and maps icon', () => {
-  const weather = { cod: 200, weather: [{ icon: '01d', description: 'clear' }] };
+test('maps all standard day/night weather icon codes', () => {
+  const codes = ['01', '02', '03', '04', '09', '10', '11', '13', '50']
+    .flatMap(code => [code + 'd', code + 'n']);
+  const weather = { cod: 200, weather: codes.map(icon => ({ icon, description: 'weather' })) };
   const result = normalizeWeather(weather);
   assert.equal(result.cod, 200);
-  assert.match(result.weather[0].icon, /^https:\/\//);
-  assert.equal(result.weather[0].description, 'clear');
-  assert.equal(weather.weather[0].icon, '01d');
+  for (let i = 0; i < codes.length; i++) {
+    assert.equal(result.weather[i].icon, `https://openweathermap.org/img/wn/${codes[i]}@2x.png`);
+    assert.equal(result.weather[i].description, 'weather');
+    assert.equal(weather.weather[i].icon, codes[i]);
+  }
+});
+
+test('preserves unrecognized icon values', () => {
+  const weather = { weather: [{ icon: 'invalid' }, { icon: null }, { icon: '99d' }] };
+  assert.deepEqual(normalizeWeather(weather).weather, weather.weather);
+  assert.equal(normalizeWeather({ cod: 200 }).cod, 200);
 });
