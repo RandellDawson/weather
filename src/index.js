@@ -39,7 +39,34 @@ function nwsValue(value, convert = x => x, unit = '') {
 const val = (x, unit = '') => x == null ? '—' : x + unit;
 function metric(label, value) { const box=document.createElement('div');box.className='metric';const small=document.createElement('small');small.textContent=label;const strong=document.createElement('strong');strong.textContent=value;box.append(small,strong);return box; }
 function card(parent, className, values) { const box=document.createElement('div');box.className=className;for(const [tag,text] of values){const node=document.createElement(tag);node.textContent=text;box.append(node);}parent.append(box); }
+// Use the forecast location's sunrise/sunset rather than the browser's timezone.
+let solarSchedule = null;
+function updateTheme() {
+  if (!solarSchedule) return;
+  const now = Date.now();
+  const today = new Intl.DateTimeFormat('en-CA', {timeZone: solarSchedule.timezone, year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now));
+  const index = solarSchedule.dates.indexOf(today);
+  if (index < 0) return;
+  const sunrise = Date.parse(solarSchedule.sunrise[index]);
+  const sunset = Date.parse(solarSchedule.sunset[index]);
+  if (!Number.isFinite(sunrise) || !Number.isFinite(sunset)) return;
+  const isDay = now >= sunrise && now < sunset;
+  document.documentElement.dataset.theme = isDay ? 'day' : 'night';
+  document.documentElement.style.colorScheme = isDay ? 'light' : 'dark';
+}
+function setSolarSchedule(forecast) {
+  if (!forecast?.timezone || !forecast.daily?.time || !forecast.daily?.sunrise || !forecast.daily?.sunset) return;
+  solarSchedule = {
+    timezone: forecast.timezone,
+    dates: forecast.daily.time,
+    sunrise: forecast.daily.sunrise,
+    sunset: forecast.daily.sunset
+  };
+  updateTheme();
+}
+
 function render(data) {
+  setSolarSchedule(data.forecast);
   const f=data.forecast, c=f.current, w=data.weatherapi;
   $('location').textContent=data.coordinates.latitude.toFixed(5)+', '+data.coordinates.longitude.toFixed(5)+' · '+f.timezone;
   const station=data.nws;
@@ -154,5 +181,6 @@ function refreshIfDue() {
   }
 }
 setInterval(refreshIfDue, 60 * 1000);
-document.addEventListener('visibilitychange', refreshIfDue);
+setInterval(updateTheme, 30 * 1000);
+document.addEventListener('visibilitychange', () => { updateTheme(); refreshIfDue(); });
 window.addEventListener('focus', refreshIfDue);
