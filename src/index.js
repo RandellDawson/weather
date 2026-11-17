@@ -54,6 +54,7 @@ function updateTheme() {
   const isDay = now >= sunrise && now < sunset;
   document.documentElement.dataset.theme = isDay ? 'day' : 'night';
   document.documentElement.style.colorScheme = isDay ? 'light' : 'dark';
+  try { localStorage.setItem('weather-theme',JSON.stringify({theme:isDay?'day':'night',savedAt:now})); } catch { /* Storage can be unavailable in private browsing. */ }
 }
 function setSolarSchedule(forecast) {
   if (!forecast?.timezone || !forecast.daily?.time || !forecast.daily?.sunrise || !forecast.daily?.sunset) return;
