@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('node:path');
 const { getWeather } = require('./weather');
 const { getDashboard } = require('./dashboard');
+const { searchLocations } = require('./locationSearch');
 const { restrictOrigin, apiLimiter } = require('./apiProtection');
 
 const app = express();
@@ -13,8 +14,9 @@ if (trustProxy !== 0 && trustProxy !== 1) {
 }
 if (trustProxy === 1) app.set('trust proxy', 'loopback');
 
-app.use(['/current', '/api/dashboard'], restrictOrigin, apiLimiter);
+app.use(['/current', '/api/dashboard', '/api/locations/search'], restrictOrigin, apiLimiter);
 app.get('/api/dashboard', getDashboard);
+app.get('/api/locations/search', searchLocations);
 
 app.get('/current', getWeather);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
