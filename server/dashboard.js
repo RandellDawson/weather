@@ -35,7 +35,7 @@ async function getDashboard(req, res) {
     Object.entries({
       latitude, longitude, timezone: 'auto', forecast_days: 16,
       temperature_unit: 'fahrenheit', wind_speed_unit: 'mph', precipitation_unit: 'inch',
-      hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,relative_humidity_2m',
+      hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,relative_humidity_2m,is_day',
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset'
     }).forEach(([k,v]) => forecastUrl.searchParams.set(k, String(v)));
     const hourlyUrl = new URL(forecastUrl);
@@ -47,7 +47,7 @@ async function getDashboard(req, res) {
     currentUrl.searchParams.delete('hourly');
     currentUrl.searchParams.delete('daily');
     currentUrl.searchParams.delete('forecast_days');
-    currentUrl.searchParams.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m');
+    currentUrl.searchParams.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,is_day');
     const [hourlyResult, dailyResult, currentResult, nwsResult, weatherApiResult] = await Promise.allSettled([
       cachedForecast(hourlyCache, key, hourlyUrl, HOURLY_TTL, forceRefresh),
       cachedForecast(dailyCache, key, dailyUrl, DAILY_TTL, forceRefresh),
