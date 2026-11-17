@@ -101,7 +101,18 @@ function render(data) {
   hourlySourceLabel.textContent='Hourly Forecast: ' + data.sources.hourly;
   const dailySourceLabel=document.createElement('span');
   dailySourceLabel.className='source-detail';
-  dailySourceLabel.textContent='Daily Forecast: ' + (Array.isArray(data.weatherapiDaily) && data.weatherapiDaily.some(day => f.daily.time.slice(0,3).includes(day.date) && Number.isFinite(day.day?.mintemp_f) && Number.isFinite(day.day?.maxtemp_f) && day.day?.condition?.text) ? 'WeatherAPI.com (First 3 Days), Open-Meteo (Remaining Days)' : data.sources.forecast);
+  const weatherApiUsed = Array.isArray(data.weatherapiDaily) && data.weatherapiDaily.some(day => f.daily.time.slice(0,3).includes(day.date) && Number.isFinite(day.day?.mintemp_f) && Number.isFinite(day.day?.maxtemp_f) && day.day?.condition?.text);
+  dailySourceLabel.textContent='Daily Forecast: ';
+  if (weatherApiUsed) {
+    dailySourceLabel.append('First 3 Days Powered by ');
+    const attribution=document.createElement('a');
+    attribution.href='https://www.weatherapi.com/';
+    attribution.title='Weather API';
+    attribution.textContent='WeatherAPI.com';
+    dailySourceLabel.append(attribution, ', Remaining Days: Open-Meteo');
+  } else {
+    dailySourceLabel.append(data.sources.forecast);
+  }
   source.append(hourlySourceLabel,dailySourceLabel);
   const m=$('metrics');m.replaceChildren();
   const obsMetric=(field, convert, unit, fallback) => useNws ? (nwsValue(obs[field]?.value,convert,unit) ?? fallback) : fallback;
