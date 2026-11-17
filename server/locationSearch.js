@@ -49,7 +49,8 @@ async function lookup(query) {
     return readJson(url);
   }));
   const seen = new Set();
-  const results = [];
+  const cities = [];
+  const airports = [];
   for (const data of responses) {
     for (const r of data?.results || []) {
       if (r.country_code !== 'US') continue;
@@ -64,11 +65,12 @@ async function lookup(query) {
       });
       if (!place || seen.has(place.id)) continue;
       seen.add(place.id);
-      results.push(place);
+      (airport ? airports : cities).push(place);
     }
   }
-  // Cities first, airports afterward; names distinguish them without headings.
-  return results.sort((a, b) => Number(/\b(?:airport|airfield|airstrip)\b/i.test(a.name)) - Number(/\b(?:airport|airfield|airstrip)\b/i.test(b.name))).slice(0, 8);
+  // Reserve slots for airports even when many towns share the searched name.
+  // Keep a single ungrouped suggestion list, with populated places first.
+  return [...cities.slice(0, 5), ...airports.slice(0, 3)].slice(0, 8);
 }
 function queryParam(req) { return typeof req.query.q === 'string' ? req.query.q.trim() : ''; }
 async function searchLocations(req, res) {
