@@ -84,9 +84,18 @@ function render(data) {
   if (useWeatherApi && w?.condition?.text) {icon.textContent=nwsConditionIcon(w.condition.text,isDay);icon.setAttribute('aria-label',w.condition.text);}
   $('current-icon').replaceChildren(icon);
   $('conditions').textContent=useNws ? (description || 'Observed conditions') : useWeatherApi ? (w.condition?.text || codeText(c.weather_code)) : codeText(c.weather_code);
-  $('source').textContent=useNws
-    ? 'NWS observed at ' + station.station.name + ' · ' + new Date(observedAt).toLocaleString()
-    : useWeatherApi ? 'WeatherAPI.com current conditions · ' + (w.last_updated || 'latest') : 'Open-Meteo modeled current conditions · ' + c.time;
+  const source=$('source');
+  if (useNws) {
+    const label=document.createElement('span');
+    label.textContent='NWS observed at ' + station.station.name;
+    const timestamp=document.createElement('time');
+    timestamp.className='source-timestamp';
+    timestamp.dateTime=obs.timestamp;
+    timestamp.textContent=new Date(observedAt).toLocaleString();
+    source.replaceChildren(label,timestamp);
+  } else {
+    source.textContent=useWeatherApi ? 'WeatherAPI.com current conditions · ' + (w.last_updated || 'latest') : 'Open-Meteo modeled current conditions · ' + c.time;
+  }
   const m=$('metrics');m.replaceChildren();
   const obsMetric=(field, convert, unit, fallback) => useNws ? (nwsValue(obs[field]?.value,convert,unit) ?? fallback) : fallback;
   [
@@ -162,7 +171,7 @@ function render(data) {
     condition.append(iconNode(f.daily.weather_code[i]),description);
     const temperatures=document.createElement('strong');
     temperatures.className='day-temperatures';
-    temperatures.textContent=Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°';
+    temperatures.textContent=Math.round(f.daily.temperature_2m_min[i])+'° / '+Math.round(f.daily.temperature_2m_max[i])+'°';
     top.append(dateLabel,condition,temperatures);
     const bottom=document.createElement('div');
     bottom.className='day-details';
