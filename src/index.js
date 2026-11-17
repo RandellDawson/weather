@@ -234,6 +234,112 @@ function render(data) {
     d.append(row);
   });
 }
+
+const RECENT_KEY = 'weather-recent-locations-v1';
+let suggestions = [], selectedSuggestion = null, activeSuggestion = -1, searchTimer = null, searchSequence = 0;
+function locationLabel(place) { return place.name + (place.region ? ', ' + place.region : ''); }
+function recentLocations() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    return Array.isArray(saved) ? saved.filter(p => p && typeof p.id === 'string' && Number.isFinite(p.lat) && Number.isFinite(p.lon)).slice(0,4) : [];
+  } catch { return []; }
+}
+function saveRecents(items) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0,4))); } catch {} renderRecents(); }
+function renderRecents() {
+  const host = $('recent-locations'); host.replaceChildren();
+  const places = recentLocations();
+  if (!places.length) return;
+  const title = document.createElement('span'); title.className = 'recent-title'; title.textContent = 'Recent Locations'; host.append(title);
+  for (const place of places) {
+    const chip = document.createElement('div'); chip.className = 'recent-chip';
+    const open = document.createElement('button'); open.type = 'button'; open.textContent = locationLabel(place);
+    open.addEventListener('click', () => chooseLocation(place));
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'recent-remove';
+    remove.textContent = '×'; remove.setAttribute('aria-label', 'Remove ' + locationLabel(place));
+    remove.addEventListener('click', () => saveRecents(recentLocations().filter(p => p.id !== place.id)));
+    chip.append(open, remove); host.append(chip);
+  }
+}
+function rememberLocation(place) {
+  // Coordinate proximity also deduplicates city and ZIP searches resolving to the same place.
+  const same = p => p.id === place.id || (Math.abs(p.lat - place.lat) < 0.015 && Math.abs(p.lon - place.lon) < 0.015);
+  saveRecents([place, ...recentLocations().filter(p => !same(p))]);
+}
+function clearSuggestions() {
+  suggestions = []; activeSuggestion = -1;
+  $('location-suggestions').replaceChildren(); $('location-suggestions').hidden = true;
+  $('location-query').setAttribute('aria-expanded','false');
+}
+function showSuggestions(items) {
+  suggestions = items; activeSuggestion = -1;
+  const list = $('location-suggestions'); list.replaceChildren();
+  items.forEach((place, index) => {
+    const item = document.createElement('button'); item.type = 'button'; item.className = 'location-option';
+    item.setAttribute('role','option'); item.id = 'location-option-' + index;
+    item.textContent = locationLabel(place);
+    item.addEventListener('click', () => { selectedSuggestion = place; $('location-query').value = locationLabel(place); clearSuggestions(); chooseLocation(place); });
+    list.append(item);
+  });
+  list.hidden = !items.length; $('location-query').setAttribute('aria-expanded', String(!!items.length));
+}
+async function findLocations(q) {
+  const response = await fetch('/api/locations/search?' + new URLSearchParams({q}), {cache:'no-store'});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Location lookup failed');
+  return data.results || [];
+}
+async function chooseLocation(place) {
+  $('location-message').textContent = '';
+  clearSuggestions();
+  const success = await load(place.lat, place.lon);
+  if (success) { rememberLocation(place); $('location-query').value = locationLabel(place); }
+  else $('location-message').textContent = 'Weather could not be loaded for ' + locationLabel(place) + '.';
+}
+const queryInput = $('location-query');
+queryInput.addEventListener('input', () => {
+  selectedSuggestion = null;
+  clearTimeout(searchTimer); searchSequence++;
+  const q = queryInput.value.trim();
+  clearSuggestions(); $('location-message').textContent = '';
+  if (q.length < 3 || /^\d+$/.test(q)) return;
+  const seq = searchSequence;
+  searchTimer = setTimeout(async () => {
+    try {
+      const results = await findLocations(q);
+      if (seq !== searchSequence) return;
+      showSuggestions(results);
+      if (!results.length) $('location-message').textContent = 'No matching U.S. cities found.';
+    } catch (error) { if (seq === searchSequence) $('location-message').textContent = error.message; }
+  }, 300);
+});
+queryInput.addEventListener('keydown', event => {
+  if (!suggestions.length) return;
+  if (event.key === 'Escape') { clearSuggestions(); return; }
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault(); activeSuggestion = (activeSuggestion + (event.key === 'ArrowDown' ? 1 : suggestions.length - 1)) % suggestions.length;
+    [...$('location-suggestions').children].forEach((node,i) => node.setAttribute('aria-selected',String(i === activeSuggestion)));
+    queryInput.setAttribute('aria-activedescendant','location-option-' + activeSuggestion);
+  } else if (event.key === 'Enter' && activeSuggestion >= 0) {
+    event.preventDefault(); const place = suggestions[activeSuggestion];
+    selectedSuggestion = place; queryInput.value = locationLabel(place); chooseLocation(place);
+  }
+});
+$('location-form').addEventListener('submit', async event => {
+  event.preventDefault(); clearTimeout(searchTimer); searchSequence++;
+  const q = queryInput.value.trim();
+  if (!q) { $('location-message').textContent = 'Enter a U.S. city or five-digit ZIP code.'; return; }
+  if (selectedSuggestion) { await chooseLocation(selectedSuggestion); return; }
+  if (/^\d+$/.test(q) && !/^\d{5}$/.test(q)) { $('location-message').textContent = 'Enter a five-digit U.S. ZIP code.'; return; }
+  if (q.length < 3) { $('location-message').textContent = 'Enter at least three letters of a city name.'; return; }
+  try {
+    const results = await findLocations(q);
+    if (!results.length) { $('location-message').textContent = 'No matching U.S. city or ZIP code found.'; return; }
+    if (results.length === 1 || /^\d{5}$/.test(q)) await chooseLocation(results[0]);
+    else { showSuggestions(results); $('location-message').textContent = 'Select a city from the suggestions.'; }
+  } catch (error) { $('location-message').textContent = error.message; }
+});
+renderRecents();
+
 const REFRESH_MS = 15 * 60 * 1000;
 let lastCoordinates = null;
 let lastSuccessfulRefresh = 0;
@@ -241,13 +347,13 @@ let loading = false;
 // A browser navigation reload triggers one uncached provider fetch.
 let reloadPending = performance.getEntriesByType('navigation').some(entry => entry.type === 'reload');
 async function load(lat,lon) {
-  if (loading) return;
+  if (loading) return false;
   loading = true;
   $('status').textContent='Loading weather…';
   const forceRefresh = reloadPending;
   reloadPending = false;
-  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);lastCoordinates={lat,lon};lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();}
-  catch(e){$('status').textContent='Unable to load weather: '+e.message;}
+  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);lastCoordinates={lat,lon};lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();return true;}
+  catch(e){$('status').textContent='Unable to load weather: '+e.message;return false;}
   finally{loading=false;}
 }
 function locate() {
