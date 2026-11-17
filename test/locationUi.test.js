@@ -95,3 +95,11 @@ test('five visible suggestions are scrollable and recent buttons are compact', (
   assert.match(css, /\.location-suggestions\s*\{[^}]*max-height:\s*205px;[^}]*overflow-y:\s*auto/);
   assert.match(css, /\.recent-chip button\s*\{[^}]*font-size:\s*\.74rem/);
 });
+
+test('recent-location clicks force a fresh dashboard request', () => {
+  assert.match(script, /open\.addEventListener\('click', \(\) => chooseLocation\(place, true\)\)/);
+  assert.match(script, /async function chooseLocation\(place, forceRefresh = false\)/);
+  assert.match(script, /load\(place\.lat, place\.lon, place, forceRefresh\)/);
+  assert.match(script, /const forceRefresh = reloadPending \|\| requestedRefresh/);
+  assert.match(script, /refresh:'1'/);
+});
