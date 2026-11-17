@@ -25,5 +25,22 @@ async function load(lat,lon) {
   try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon}));const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();}
   catch(e){$('status').textContent='Unable to load weather: '+e.message;}
 }
-$('coordinates').addEventListener('submit',e=>{e.preventDefault();load($('lat').value,$('lon').value);});
-$('locate').addEventListener('click',()=>{if(!navigator.geolocation){$('status').textContent='Geolocation is not supported.';return;}navigator.geolocation.getCurrentPosition(p=>{const {latitude,longitude}=p.coords;$('lat').value=latitude;$('lon').value=longitude;load(latitude,longitude);},()=>{$('status').textContent='Location permission unavailable. Enter coordinates instead.';},{enableHighAccuracy:true,timeout:12000});});
+function locate() {
+  if (!navigator.geolocation) {
+    $('status').textContent='Your browser does not support geolocation.';
+    return;
+  }
+  $('status').textContent='Requesting your location…';
+  navigator.geolocation.getCurrentPosition(
+    position => load(position.coords.latitude, position.coords.longitude),
+    error => {
+      const message = error.code === 1 ? 'Location permission denied. Enable location access in your browser settings and retry.'
+        : error.code === 2 ? 'Your location could not be determined. Please retry.'
+        : 'Location request timed out. Please retry.';
+      $('status').textContent=message;
+    },
+    {enableHighAccuracy:true,timeout:12000,maximumAge:60000}
+  );
+}
+$('locate').addEventListener('click',locate);
+locate();
