@@ -10,7 +10,7 @@ async function readJson(url) {
 function normalize(entry) {
   const lat = Number(entry.latitude), lon = Number(entry.longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 24 || lat > 50 || lon < -125 || lon > -66) return null;
-  return { id: entry.id || 'zip:' + entry.zip, name: entry.name, region: entry.region, lat, lon };
+  return { id: entry.id || 'zip:' + entry.zip, name: entry.name, region: entry.region, ...(entry.zip ? {zip: entry.zip} : {}), lat, lon };
 }
 async function lookup(query) {
   const q = String(query || '').trim();
