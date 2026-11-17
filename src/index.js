@@ -239,6 +239,7 @@ const RECENT_KEY = 'weather-recent-locations-v1';
 let suggestions = [], selectedSuggestion = null, activeSuggestion = -1, searchTimer = null, searchSequence = 0;
 function locationLabel(place) { return place.name + (place.region ? ', ' + place.region : ''); }
 function suggestionLabel(place) { return place.zip ? place.zip + ' — ' + locationLabel(place) : locationLabel(place); }
+function recentLabel(place) { return locationLabel(place) + (place.zip ? ' (' + place.zip + ')' : ''); }
 const US_STATES = {
   AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',
   DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',
@@ -256,8 +257,10 @@ function normalizedPlaceKey(place) {
   return normalize(place.name) + ':' + normalize(fullState);
 }
 function samePlace(a, b) {
-  return a.id === b.id || normalizedPlaceKey(a) === normalizedPlaceKey(b) ||
-    (Math.abs(a.lat - b.lat) < 0.015 && Math.abs(a.lon - b.lon) < 0.015);
+  // A ZIP search is distinct from a city search, even if both resolve to the same city.
+  // ZIPs must match by their exact five-digit code, not by city name or coordinates.
+  if (a.zip || b.zip) return Boolean(a.zip && b.zip && a.zip === b.zip);
+  return a.id === b.id || normalizedPlaceKey(a) === normalizedPlaceKey(b);
 }
 function recentLocations() {
   try {
@@ -280,10 +283,10 @@ function renderRecents() {
   const title = document.createElement('span'); title.className = 'recent-title'; title.textContent = 'Recent Locations'; host.append(title);
   for (const place of places) {
     const chip = document.createElement('div'); chip.className = 'recent-chip';
-    const open = document.createElement('button'); open.type = 'button'; open.textContent = locationLabel(place);
+    const open = document.createElement('button'); open.type = 'button'; open.textContent = recentLabel(place);
     open.addEventListener('click', () => chooseLocation(place));
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'recent-remove';
-    remove.textContent = '×'; remove.setAttribute('aria-label', 'Remove ' + locationLabel(place));
+    remove.textContent = '×'; remove.setAttribute('aria-label', 'Remove ' + recentLabel(place));
     remove.addEventListener('click', () => saveRecents(recentLocations().filter(p => p.id !== place.id)));
     chip.append(open, remove); host.append(chip);
   }
