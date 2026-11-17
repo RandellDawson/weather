@@ -130,8 +130,6 @@ function render(data) {
   ].forEach(([a,b])=>m.append(metric(a,b)));
   const h=$('hourly');h.replaceChildren();
   const hourlySource=data.sources.hourly;
-  const title=document.querySelector('.panel h2');
-  if (title) title.textContent='Next 24 Hours · '+hourlySource;
   function compass(degrees) {
     return Number.isFinite(degrees) ? ['N','NE','E','SE','S','SW','W','NW'][Math.round(((degrees % 360) + 360) % 360 / 45) % 8] : null;
   }
