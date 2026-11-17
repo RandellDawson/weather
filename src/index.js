@@ -270,12 +270,12 @@ function recentLocations() {
     for (const place of saved) {
       if (!place || typeof place.id !== 'string' || !Number.isFinite(place.lat) || !Number.isFinite(place.lon)) continue;
       if (!unique.some(existing => samePlace(existing, place))) unique.push(place);
-      if (unique.length === 4) break;
+      if (unique.length === 5) break;
     }
     return unique;
   } catch { return []; }
 }
-function saveRecents(items) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0,4))); } catch {} renderRecents(); }
+function saveRecents(items) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0,5))); } catch {} renderRecents(); }
 function renderRecents() {
   const host = $('recent-locations'); host.replaceChildren();
   const places = recentLocations();
