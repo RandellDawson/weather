@@ -171,7 +171,7 @@ function render(data) {
     condition.append(iconNode(f.daily.weather_code[i]),description);
     const temperatures=document.createElement('strong');
     temperatures.className='day-temperatures';
-    temperatures.textContent=Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°';
+    temperatures.textContent=Math.round(f.daily.temperature_2m_min[i])+'° / '+Math.round(f.daily.temperature_2m_max[i])+'°';
     top.append(dateLabel,condition,temperatures);
     const bottom=document.createElement('div');
     bottom.className='day-details';
