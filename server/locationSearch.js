@@ -40,14 +40,33 @@ async function lookup(query) {
       }
     }
   }
-  const responses = await Promise.all([...names].map(async name => {
+  // Search airport variants independently; airports often have a different
+  // official name from the nearby town and rank poorly in generic searches.
+  const airportNames = new Set();
+  for (const name of names) {
+    const base = name.replace(/\s+(?:municipal|regional)?\s*airport$/i, '').trim();
+    for (const suffix of ['Airport', 'Municipal Airport', 'Regional Airport']) {
+      airportNames.add(base + ' ' + suffix);
+    }
+  }
+  const queries = [...new Set([...names, ...airportNames])].slice(0, 16);
+  const responses = await Promise.all(queries.map(async name => {
     const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
     url.searchParams.set('name', name);
-    url.searchParams.set('count', '20');
+    url.searchParams.set('count', '30');
     url.searchParams.set('language', 'en');
     url.searchParams.set('countryCode', 'US');
     return readJson(url);
   }));
+  const normalizeTerms = value => String(value).toLowerCase()
+    .replace(/\bst\.?\b/g, 'saint').replace(/\bft\.?\b/g, 'fort')
+    .replace(/\bmt\.?\b/g, 'mount').replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/);
+  const requestedTerms = normalizeTerms(q).filter(word =>
+    !['airport', 'municipal', 'regional', 'airfield', 'airstrip'].includes(word));
+  const matchesQuery = name => {
+    const terms = new Set(normalizeTerms(name));
+    return requestedTerms.every(word => terms.has(word));
+  };
   const seen = new Set();
   const cities = [];
   const airports = [];
@@ -59,6 +78,7 @@ async function lookup(query) {
       const airport = /\b(?:airport|airfield|airstrip)\b/i.test(r.name) || /^AIR/i.test(r.feature_code || '');
       const populated = !r.feature_code || /^PPL/i.test(r.feature_code);
       if (!airport && !populated) continue;
+      if (!matchesQuery(r.name)) continue;
       const place = normalize({
         id: 'city:' + r.id, name: r.name, region: r.admin1,
         latitude: r.latitude, longitude: r.longitude
