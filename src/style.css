@@ -44,3 +44,16 @@
 .hour{min-width:142px}
 .hour-wind{display:flex;flex-direction:column;gap:4px;margin-top:10px;padding-top:9px;border-top:1px solid #40536b;font-size:.76rem;line-height:1.4;text-align:left}
 :root[data-theme="day"] .hour-wind{border-top-color:#cbd9e6}
+
+/* Two-line 16-day forecast with daily wind information. */
+.day{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+.day-top{display:grid;grid-template-columns:minmax(105px,1fr) minmax(160px,2fr) auto;align-items:center;gap:16px}
+.day-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;gap:12px;padding-top:9px;border-top:1px solid #40536b;font-size:.85rem}
+.day-wind,.day-gust{white-space:normal}
+:root[data-theme="day"] .day-details{border-top-color:#cbd9e6}
+@media(max-width:650px){
+  .day-top{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}
+  .day-condition{grid-column:1;grid-row:2}
+  .day-temperatures{grid-column:2;grid-row:1;text-align:right}
+  .day-details{display:flex;flex-wrap:wrap;gap:8px 16px}
+}

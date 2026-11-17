@@ -91,7 +91,7 @@ async function getDashboard(req, res) {
       latitude, longitude, timezone: 'auto', forecast_days: 16,
       temperature_unit: 'fahrenheit', wind_speed_unit: 'mph', precipitation_unit: 'inch',
       hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,is_day',
-      daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset'
+      daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,sunrise,sunset'
     }).forEach(([k,v]) => forecastUrl.searchParams.set(k, String(v)));
     const hourlyUrl = new URL(forecastUrl);
     hourlyUrl.searchParams.delete('daily');
