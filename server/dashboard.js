@@ -46,7 +46,7 @@ async function getWeatherApi(latitude, longitude, key, forceRefresh) {
   const url = new URL('https://api.weatherapi.com/v1/forecast.json');
   url.searchParams.set('key', process.env.WEATHERAPI_KEY);
   url.searchParams.set('q', latitude + ',' + longitude);
-  url.searchParams.set('days', '2');
+  url.searchParams.set('days', '3');
   url.searchParams.set('aqi', 'no');
   url.searchParams.set('alerts', 'no');
   // Fetch current independently: forecast entitlement/errors must not suppress current metrics.
@@ -124,6 +124,7 @@ async function getDashboard(req, res) {
       nwsHourly: hourlySource === 'NWS' ? nws.hourly : null,
       weatherapi: weatherapi?.current || null,
       weatherapiHourly: hourlySource === 'WeatherAPI.com' ? weatherapi.forecast.forecastday.flatMap(d => d.hour || []) : null,
+      weatherapiDaily: Array.isArray(weatherapi?.forecast?.forecastday) ? weatherapi.forecast.forecastday : [],
       sources: { forecast: 'Open-Meteo', hourly: hourlySource, station: 'NWS', current: currentSource },
       fetchedAt: new Date().toISOString()
     };
