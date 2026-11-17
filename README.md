@@ -17,9 +17,9 @@ Open http://localhost:3000 and allow browser geolocation when prompted. The app 
 
 ## Data sources
 
-- **WeatherAPI.com (optional)**: current-condition estimate at supplied coordinates, using a server-side `WEATHERAPI_KEY`. The key is never returned to the browser.
-- **Open-Meteo**: modeled current conditions when WeatherAPI is not configured; hourly and 16-day forecasts.
-- **NWS**: latest actual observation from the first station returned for the requested point, within the contiguous United States. Observations may be delayed, unavailable, or differ from conditions at the coordinates.
+- **NWS (primary current conditions)**: latest actual observation from the first station returned for the requested point, within the contiguous United States. The main panel uses NWS when the observation is no more than 90 minutes old and includes a valid temperature. It shows the station and timestamp. Other NWS measurements are used when available; individual missing values may fall back to modeled values. Station readings can differ from conditions at the user's coordinates.
+- **Open-Meteo**: modeled current conditions when NWS is stale/unavailable; hourly and 16-day forecasts. The modeled feels-like temperature and cloud cover remain labeled in the UI.
+- **WeatherAPI.com (optional)**: retained server-side integration, but no longer overrides the main NWS current-conditions panel. The `WEATHERAPI_KEY` remains private.
 
 `GET /api/dashboard?lat=37.0965&lon=-113.5684` aggregates the sources. Existing `/current` OpenWeather endpoint remains available for compatibility during migration. `/health` is unchanged.
 
