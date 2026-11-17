@@ -22,25 +22,58 @@ function iconNode(code, isDay = true) {
   node.textContent = weatherIcon(code, isDay);
   return node;
 }
+function nwsConditionIcon(description, isDay) {
+  const t = (description || '').toLowerCase();
+  if (/thunder|lightning/.test(t)) return '⛈️';
+  if (/snow|sleet|ice pellets|blizzard/.test(t)) return '🌨️';
+  if (/rain|showers|drizzle/.test(t)) return '🌧️';
+  if (/fog|mist|haze|smoke/.test(t)) return '🌫️';
+  if (/overcast|cloudy/.test(t)) return '☁️';
+  if (/partly|mostly sunny|mostly clear/.test(t)) return isDay ? '⛅' : '☁️';
+  if (/clear|sunny|fair/.test(t)) return isDay ? '☀️' : '🌙';
+  return '🌥️';
+}
+function nwsValue(value, convert = x => x, unit = '') {
+  return typeof value === 'number' && Number.isFinite(value) ? val(Math.round(convert(value) * 10) / 10, unit) : null;
+}
 const val = (x, unit = '') => x == null ? '—' : x + unit;
 function metric(label, value) { const box=document.createElement('div');box.className='metric';const small=document.createElement('small');small.textContent=label;const strong=document.createElement('strong');strong.textContent=value;box.append(small,strong);return box; }
 function card(parent, className, values) { const box=document.createElement('div');box.className=className;for(const [tag,text] of values){const node=document.createElement(tag);node.textContent=text;box.append(node);}parent.append(box); }
 function render(data) {
   const f=data.forecast, c=f.current, w=data.weatherapi;
   $('location').textContent=data.coordinates.latitude.toFixed(5)+', '+data.coordinates.longitude.toFixed(5)+' · '+f.timezone;
-  $('temperature').textContent=val(w?.temp_f ?? c.temperature_2m,'°F');
-  $('current-icon').replaceChildren(iconNode(c.weather_code, c.is_day !== 0));
-  $('conditions').textContent=w?.condition?.text || codeText(c.weather_code);
-  $('source').textContent=(w?'WeatherAPI.com estimated current conditions':'Open-Meteo modeled current conditions')+' · '+(w?.last_updated || c.time);
+  const station=data.nws;
+  const obs=station?.observation;
+  const observedAt=obs?.timestamp ? Date.parse(obs.timestamp) : NaN;
+  // Reject missing, future, or stale observations; keep the forecast usable.
+  const useNws = Number.isFinite(observedAt) && Date.now() - observedAt >= -5 * 60 * 1000 && Date.now() - observedAt <= 90 * 60 * 1000 && typeof obs.temperature?.value === 'number';
+  const isDay=c.is_day !== 0;
+  const description=obs?.textDescription?.trim();
+  $('temperature').textContent=useNws ? nwsValue(obs.temperature.value, x => x * 9 / 5 + 32, '°F') : val(c.temperature_2m,'°F');
+  const icon=iconNode(c.weather_code,isDay);
+  if (useNws && description) {icon.textContent=nwsConditionIcon(description,isDay);icon.setAttribute('aria-label',description);}
+  $('current-icon').replaceChildren(icon);
+  $('conditions').textContent=useNws ? (description || 'Observed conditions') : codeText(c.weather_code);
+  $('source').textContent=useNws
+    ? 'NWS observed at ' + station.station.name + ' · ' + new Date(observedAt).toLocaleString()
+    : 'Open-Meteo modeled current conditions · ' + c.time + (obs ? ' · NWS observation unavailable or stale' : '');
   const m=$('metrics');m.replaceChildren();
-  [['Feels like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],['Humidity',val(w?.humidity ?? c.relative_humidity_2m,'%')],['Wind',val(w?.wind_mph ?? c.wind_speed_10m,' mph')],['Gust',val(w?.gust_mph,' mph')],['Dew point',val(w?.dewpoint_f,'°F')],['Pressure',val(w?.pressure_in,' inHg')],['Cloud cover',val(w?.cloud ?? c.cloud_cover,'%')],['UV index',val(w?.uv)]].forEach(([a,b])=>m.append(metric(a,b)));
+  const obsMetric=(field, convert, unit, fallback) => useNws ? (nwsValue(obs[field]?.value,convert,unit) ?? fallback) : fallback;
+  [
+    ['Feels like',val(c.apparent_temperature,'°F')],
+    ['Humidity',obsMetric('relativeHumidity',x=>x,'%',val(c.relative_humidity_2m,'%'))],
+    ['Wind',obsMetric('windSpeed',x=>x*2.236936,' mph',val(c.wind_speed_10m,' mph'))],
+    ['Gust',obsMetric('windGust',x=>x*2.236936,' mph','—')],
+    ['Dew point',obsMetric('dewpoint',x=>x*9/5+32,'°F','—')],
+    ['Pressure',obsMetric('barometricPressure',x=>x/3386.389,' inHg','—')],
+    ['Cloud cover',val(c.cloud_cover,'%')]
+  ].forEach(([a,b])=>m.append(metric(a,b)));
   const h=$('hourly');h.replaceChildren();
   const times=f.hourly.time;let start=times.findIndex(t=>t>=c.time.slice(0,13)+':00');if(start<0)start=0;
   for(let i=start;i<Math.min(start+24,times.length);i++){const date=new Date(times[i]+'Z');card(h,'hour',[['small',new Intl.DateTimeFormat('en-US',{hour:'numeric',timeZone:'UTC'}).format(date)],['strong',val(Math.round(f.hourly.temperature_2m[i]),'°')],['small',codeText(f.hourly.weather_code[i])],['small',val(f.hourly.precipitation_probability[i],'% rain')]]);const hour=h.lastElementChild;hour.insertBefore(iconNode(f.hourly.weather_code[i],f.hourly.is_day?.[i] !== 0),hour.children[1]);}
   const d=$('daily');d.replaceChildren();
   f.daily.time.forEach((date,i)=>{card(d,'day',[['small',date],['strong',Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°'],['span',codeText(f.daily.weather_code[i])],['p',val(f.daily.precipitation_probability_max[i],'% rain')]]);const day=d.lastElementChild;day.insertBefore(iconNode(f.daily.weather_code[i]),day.children[1]);});
-  const station=data.nws;
-  $('station').textContent=station?.observation ? station.station.name+': '+(station.observation.temperature?.value==null?'Temperature unavailable':(station.observation.temperature.value*9/5+32).toFixed(1)+'°F')+' · observed '+(station.observation.timestamp||'unknown time') : 'No current NWS station observation available for these coordinates.';
+  $('station').textContent=obs ? station.station.name+': '+(obs.temperature?.value==null?'Temperature unavailable':(obs.temperature.value*9/5+32).toFixed(1)+'°F')+' · observed '+(obs.timestamp||'unknown time')+(useNws?' · Used for current conditions':' · Not used for current conditions (missing or stale temperature)') : 'No current NWS station observation available for these coordinates.';
 }
 const REFRESH_MS = 15 * 60 * 1000;
 let lastCoordinates = null;
