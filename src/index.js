@@ -251,7 +251,7 @@ const US_STATES = {
   VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'
 };
 function normalizedPlaceKey(place) {
-  const normalize = value => String(value || '').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const normalize = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
   const state = String(place.region || '').trim();
   const fullState = US_STATES[state.toUpperCase()] || state;
   return normalize(place.name) + ':' + normalize(fullState);
