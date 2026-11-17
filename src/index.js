@@ -44,7 +44,8 @@ let solarSchedule = null;
 function updateTheme() {
   if (!solarSchedule) return;
   const now = Date.now();
-  const today = new Intl.DateTimeFormat('en-CA', {timeZone: solarSchedule.timezone, year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now));
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {timeZone: solarSchedule.timezone, year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now)).map(part => [part.type, part.value]));
+  const today = parts.year + '-' + parts.month + '-' + parts.day;
   const index = solarSchedule.dates.indexOf(today);
   if (index < 0) return;
   const sunrise = Date.parse(solarSchedule.sunrise[index]);
