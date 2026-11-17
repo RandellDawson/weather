@@ -126,7 +126,9 @@ function render(data) {
     ['Gust',obsMetric('windGust',x=>x*2.236936,' mph',val(w?.gust_mph ?? c.wind_gusts_10m,' mph'))],
     ['Dew Point',obsMetric('dewpoint',x=>x*9/5+32,'°F',val(w?.dewpoint_f,'°F'))],
     ['Pressure',obsMetric('barometricPressure',x=>x/3386.389,' inHg',val(w?.pressure_in ?? (Number.isFinite(c.surface_pressure) ? Math.round(c.surface_pressure * 0.0295299830714 * 100) / 100 : null),' inHg'))],
-    ['Cloud Cover',val(c.cloud_cover,'%')]
+    // NWS observations expose cloud layers, not a reliable total percentage.
+    // Prefer WeatherAPI's measured cloud percentage over Open-Meteo's modeled value.
+    ['Cloud Cover',val(Number.isFinite(w?.cloud) ? w.cloud : c.cloud_cover,'%')]
   ].forEach(([a,b])=>m.append(metric(a,b)));
   const h=$('hourly');h.replaceChildren();
   const hourlySource=data.sources.hourly;
