@@ -303,6 +303,8 @@ function clearSuggestions() {
 function showSuggestions(items) {
   suggestions = items; activeSuggestion = -1;
   const list = $('location-suggestions'); list.replaceChildren();
+  // A new query must start at the first result, even after scrolling a prior list.
+  list.scrollTop = 0;
   items.forEach((place, index) => {
     const item = document.createElement('button'); item.type = 'button'; item.className = 'location-option';
     item.setAttribute('role','option'); item.id = 'location-option-' + index;
