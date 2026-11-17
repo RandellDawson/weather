@@ -68,6 +68,7 @@ async function lookup(query) {
     return requestedTerms.every(word => terms.has(word));
   };
   const seen = new Set();
+  const seenNames = new Set();
   const cities = [];
   const airports = [];
   for (const data of responses) {
@@ -84,7 +85,12 @@ async function lookup(query) {
         latitude: r.latitude, longitude: r.longitude
       });
       if (!place || seen.has(place.id)) continue;
+      // Geocoder may return separate IDs for St/Saint spellings of one airport.
+      // Keep the first matching name within the same state; never merge ZIPs here.
+      const nameKey = normalizeTerms(place.name).join(' ') + ':' + String(place.region || '').toLowerCase();
+      if (seenNames.has(nameKey)) continue;
       seen.add(place.id);
+      seenNames.add(nameKey);
       (airport ? airports : cities).push(place);
     }
   }
