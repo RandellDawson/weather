@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('node:path');
 const { getWeather } = require('./weather');
+const { getDashboard } = require('./dashboard');
 const { restrictOrigin, apiLimiter } = require('./apiProtection');
 
 const app = express();
@@ -12,7 +13,8 @@ if (trustProxy !== 0 && trustProxy !== 1) {
 }
 if (trustProxy === 1) app.set('trust proxy', 'loopback');
 
-app.use('/current', restrictOrigin, apiLimiter);
+app.use(['/current', '/api/dashboard'], restrictOrigin, apiLimiter);
+app.get('/api/dashboard', getDashboard);
 
 app.get('/current', getWeather);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

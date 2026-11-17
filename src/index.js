@@ -1,91 +1,95 @@
 'use strict';
-
-function runApp() {
-  const elems = {
-    app: document.querySelector('.app'),
-    degreeUnit: document.getElementById('degree-unit'),
-    title: document.getElementById('title'),
-    weatherDesc: document.getElementById('weather-description'),
-    icon: document.getElementById('icon'),
-    tempValue: document.getElementById('temp-value')
-  };
-  let celsius = null;
-  let currentUnit = 'C';
-
-  async function checkResponse(response) {
-    if (!response.ok) throw new Error('Request failed (' + response.status + ')');
-    return response.json();
-  }
-
-
-  async function getWeather(location) {
-    const coords = location.coords || location;
-    const params = new URLSearchParams({
-      lat: coords.latitude,
-      lon: coords.longitude
-    });
-    const data = await checkResponse(await fetch('/current?' + params));
-    updateWeather(data);
-  }
-
-  function updateWeather(data) {
-    const item = data.weather && data.weather[0];
-    if (!item || !data.main || !Number.isFinite(Number(data.main.temp))) {
-      throw new Error('Unexpected weather response');
-    }
-    elems.title.textContent = data.name || 'Local weather';
-    elems.weatherDesc.textContent = item.main || '';
-    if (item.icon) {
-      elems.icon.src = item.icon;
-      elems.icon.alt = item.description || '';
-    }
-    celsius = Number(data.main.temp);
-    currentUnit = data.sys && data.sys.country === 'US' ? 'F' : 'C';
-    renderTemperature();
-    elems.app.classList.add('show');
-  }
-
-  function renderTemperature() {
-    if (celsius === null) return;
-    elems.tempValue.textContent = currentUnit === 'F'
-      ? String(Math.round(celsius * 9 / 5 + 32))
-      : celsius.toFixed(1);
-    elems.degreeUnit.textContent = '°' + currentUnit;
-  }
-
-  elems.degreeUnit.addEventListener('click', () => {
-    currentUnit = currentUnit === 'F' ? 'C' : 'F';
-    renderTemperature();
-  });
-
-  async function start() {
-    if (!navigator.geolocation) {
-      elems.title.textContent = 'Location unavailable';
-      elems.weatherDesc.textContent = 'Your browser does not support location access.';
-      elems.app.classList.add('show');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      async location => {
-        try {
-          await getWeather(location);
-        } catch (error) {
-          console.error('Weather unavailable:', error);
-          elems.title.textContent = 'Weather unavailable';
-          elems.weatherDesc.textContent = 'Please try again later.';
-          elems.app.classList.add('show');
-        }
-      },
-      error => {
-        console.error('Location unavailable:', error);
-        elems.title.textContent = 'Location unavailable';
-        elems.weatherDesc.textContent = 'Allow location access in your browser and reload this page.';
-        elems.app.classList.add('show');
-      },
-      { timeout: 8000 }
-    );
-  }
-
-  start();
+const $ = id => document.getElementById(id);
+const codeText = c => ({0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Cloudy',45:'Fog',48:'Fog',51:'Drizzle',53:'Drizzle',55:'Drizzle',61:'Rain',63:'Rain',65:'Heavy rain',71:'Snow',73:'Snow',75:'Heavy snow',80:'Showers',81:'Showers',82:'Heavy showers',95:'Thunderstorms'})[c] || 'Variable conditions';
+// Local, dependency-free weather icons. Supports Open-Meteo WMO codes and day/night.
+function weatherIcon(code, isDay = true) {
+  if (code === 0) return isDay ? '☀️' : '🌙';
+  if (code === 1) return isDay ? '🌤️' : '🌙';
+  if (code === 2) return isDay ? '⛅' : '☁️';
+  if (code === 3) return '☁️';
+  if (code === 45 || code === 48) return '🌫️';
+  if ([51,53,55,56,57].includes(code)) return '🌦️';
+  if ([61,63,65,66,67,80,81,82].includes(code)) return '🌧️';
+  if ([71,73,75,77,85,86].includes(code)) return '🌨️';
+  if ([95,96,99].includes(code)) return '⛈️';
+  return '🌥️';
 }
-document.addEventListener('DOMContentLoaded', runApp);
+function iconNode(code, isDay = true) {
+  const node = document.createElement('span');
+  node.className = 'weather-icon';
+  node.setAttribute('role','img');
+  node.setAttribute('aria-label', codeText(code));
+  node.textContent = weatherIcon(code, isDay);
+  return node;
+}
+const val = (x, unit = '') => x == null ? '—' : x + unit;
+function metric(label, value) { const box=document.createElement('div');box.className='metric';const small=document.createElement('small');small.textContent=label;const strong=document.createElement('strong');strong.textContent=value;box.append(small,strong);return box; }
+function card(parent, className, values) { const box=document.createElement('div');box.className=className;for(const [tag,text] of values){const node=document.createElement(tag);node.textContent=text;box.append(node);}parent.append(box); }
+function render(data) {
+  const f=data.forecast, c=f.current, w=data.weatherapi;
+  $('location').textContent=data.coordinates.latitude.toFixed(5)+', '+data.coordinates.longitude.toFixed(5)+' · '+f.timezone;
+  $('temperature').textContent=val(w?.temp_f ?? c.temperature_2m,'°F');
+  $('current-icon').replaceChildren(iconNode(c.weather_code, c.is_day !== 0));
+  $('conditions').textContent=w?.condition?.text || codeText(c.weather_code);
+  $('source').textContent=(w?'WeatherAPI.com estimated current conditions':'Open-Meteo modeled current conditions')+' · '+(w?.last_updated || c.time);
+  const m=$('metrics');m.replaceChildren();
+  [['Feels like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],['Humidity',val(w?.humidity ?? c.relative_humidity_2m,'%')],['Wind',val(w?.wind_mph ?? c.wind_speed_10m,' mph')],['Gust',val(w?.gust_mph,' mph')],['Dew point',val(w?.dewpoint_f,'°F')],['Pressure',val(w?.pressure_in,' inHg')],['Cloud cover',val(w?.cloud ?? c.cloud_cover,'%')],['UV index',val(w?.uv)]].forEach(([a,b])=>m.append(metric(a,b)));
+  const h=$('hourly');h.replaceChildren();
+  const times=f.hourly.time;let start=times.findIndex(t=>t>=c.time.slice(0,13)+':00');if(start<0)start=0;
+  for(let i=start;i<Math.min(start+24,times.length);i++){const date=new Date(times[i]+'Z');card(h,'hour',[['small',new Intl.DateTimeFormat('en-US',{hour:'numeric',timeZone:'UTC'}).format(date)],['strong',val(Math.round(f.hourly.temperature_2m[i]),'°')],['small',codeText(f.hourly.weather_code[i])],['small',val(f.hourly.precipitation_probability[i],'% rain')]]);const hour=h.lastElementChild;hour.insertBefore(iconNode(f.hourly.weather_code[i],f.hourly.is_day?.[i] !== 0),hour.children[1]);}
+  const d=$('daily');d.replaceChildren();
+  f.daily.time.forEach((date,i)=>{card(d,'day',[['small',date],['strong',Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°'],['span',codeText(f.daily.weather_code[i])],['p',val(f.daily.precipitation_probability_max[i],'% rain')]]);const day=d.lastElementChild;day.insertBefore(iconNode(f.daily.weather_code[i]),day.children[1]);});
+  const station=data.nws;
+  $('station').textContent=station?.observation ? station.station.name+': '+(station.observation.temperature?.value==null?'Temperature unavailable':(station.observation.temperature.value*9/5+32).toFixed(1)+'°F')+' · observed '+(station.observation.timestamp||'unknown time') : 'No current NWS station observation available for these coordinates.';
+}
+const REFRESH_MS = 15 * 60 * 1000;
+let lastCoordinates = null;
+let lastSuccessfulRefresh = 0;
+let loading = false;
+// A browser navigation reload triggers one uncached provider fetch.
+let reloadPending = performance.getEntriesByType('navigation').some(entry => entry.type === 'reload');
+async function load(lat,lon) {
+  if (loading) return;
+  loading = true;
+  $('status').textContent='Loading weather…';
+  const forceRefresh = reloadPending;
+  reloadPending = false;
+  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);lastCoordinates={lat,lon};lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();}
+  catch(e){$('status').textContent='Unable to load weather: '+e.message;}
+  finally{loading=false;}
+}
+function locate() {
+  const button = $('locate');
+  button.disabled = true;
+  button.textContent = 'Updating…';
+  const finish = () => { button.disabled = false; button.textContent = '↻ Refresh location'; };
+  if (!navigator.geolocation) {
+    $('status').textContent='Your browser does not support geolocation.';
+    finish();
+    return;
+  }
+  $('status').textContent='Requesting your location…';
+  navigator.geolocation.getCurrentPosition(
+    async position => { try { await load(position.coords.latitude, position.coords.longitude); } finally { finish(); } },
+    error => {
+      const message = error.code === 1 ? 'Location permission denied. Enable location access in your browser settings and retry.'
+        : error.code === 2 ? 'Your location could not be determined. Please retry.'
+        : 'Location request timed out. Please retry.';
+      $('status').textContent=message;
+      finish();
+    },
+    {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+  );
+}
+$('locate').addEventListener('click',locate);
+locate();
+
+// Background tabs may throttle timers; catch up when the page becomes visible.
+function refreshIfDue() {
+  if (!document.hidden && lastCoordinates && !loading && Date.now() - lastSuccessfulRefresh >= REFRESH_MS) {
+    load(lastCoordinates.lat,lastCoordinates.lon);
+  }
+}
+setInterval(refreshIfDue, 60 * 1000);
+document.addEventListener('visibilitychange', refreshIfDue);
+window.addEventListener('focus', refreshIfDue);
