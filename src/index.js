@@ -136,9 +136,12 @@ function render(data) {
     const directionText=windDirection ? windDirection+' ' : '';
     const speed=document.createElement('span');
     speed.textContent='Wind: '+directionText+speedText;
-    const gust=document.createElement('span');
-    gust.textContent='Gusts: '+(Number.isFinite(windGust) ? Math.round(windGust)+' mph' : '—');
-    wind.append(speed,gust);
+    wind.append(speed);
+    if (Number.isFinite(windGust)) {
+      const gust=document.createElement('span');
+      gust.textContent='Gusts: '+Math.round(windGust)+' mph';
+      wind.append(gust);
+    }
     hour.append(wind);
   }
   if (hourlySource==='NWS') {
