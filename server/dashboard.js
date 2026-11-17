@@ -5,10 +5,10 @@ const HOURLY_TTL = 30 * 60 * 1000;
 const DAILY_TTL = 60 * 60 * 1000;
 const hourlyCache = new Map();
 const dailyCache = new Map();
-async function cachedForecast(store, key, url, ttl, forceRefresh = false) {
+async function cachedForecast(store, key, url, ttl, forceRefresh = false, headers = {}) {
   const item = store.get(key);
   if (!forceRefresh && item && item.expires > Date.now()) return item.data;
-  const data = await json(url);
+  const data = await json(url, headers);
   if (store.size >= 200 && !store.has(key)) store.delete(store.keys().next().value);
   store.set(key, { data, expires: Date.now() + ttl });
   return data;
@@ -18,6 +18,54 @@ async function json(url, headers = {}) {
   if (!response.ok) throw new Error('Provider HTTP ' + response.status);
   return response.json();
 }
+
+const nwsHeaders = { 'User-Agent': 'RandellDawson-weather (weather.randelldawson.com)', Accept: 'application/geo+json' };
+const observationAge = observation => observation?.timestamp ? Date.now() - Date.parse(observation.timestamp) : Infinity;
+const usableObservation = observation => Number.isFinite(observation?.temperature?.value) && observationAge(observation) >= -300000 && observationAge(observation) <= 5400000;
+async function getNws(latitude, longitude, key, forceRefresh) {
+  const point = await json('https://api.weather.gov/points/' + latitude.toFixed(4) + ',' + longitude.toFixed(4), nwsHeaders);
+  const stations = await json(point.properties.observationStations, nwsHeaders);
+  const candidates = (stations.features || []).slice(0, 5);
+  const results = await Promise.allSettled(candidates.map(async station => ({
+    station: { id: station.id, name: station.properties?.name || station.id, coordinates: station.geometry?.coordinates },
+    observation: (await json(station.id + '/observations/latest', nwsHeaders)).properties
+  })));
+  const valid = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+  // Station list is already distance-ordered. Prefer a fresh, complete observation.
+  const selected = valid.find(r => usableObservation(r.observation)) || valid[0] || null;
+  const hourlyUrl = point.properties.forecastHourly;
+  let hourly = null;
+  if (hourlyUrl) {
+    try { hourly = (await cachedForecast(hourlyCache, 'nws:' + key, hourlyUrl, HOURLY_TTL, forceRefresh, nwsHeaders)).properties?.periods || null; }
+    catch (error) { console.warn('NWS hourly forecast unavailable:', error.message); }
+  }
+  return { selected, hourly };
+}
+async function getWeatherApi(latitude, longitude, key, forceRefresh) {
+  if (!process.env.WEATHERAPI_KEY) return null;
+  const url = new URL('https://api.weatherapi.com/v1/forecast.json');
+  url.searchParams.set('key', process.env.WEATHERAPI_KEY);
+  url.searchParams.set('q', latitude + ',' + longitude);
+  url.searchParams.set('days', '2');
+  url.searchParams.set('aqi', 'no');
+  url.searchParams.set('alerts', 'no');
+  const forecast = await cachedForecast(hourlyCache, 'weatherapi:' + key, url, HOURLY_TTL, forceRefresh);
+  // Current observations must not inherit the 30-minute hourly forecast cache.
+  const currentUrl = new URL('https://api.weatherapi.com/v1/current.json');
+  currentUrl.searchParams.set('key', process.env.WEATHERAPI_KEY);
+  currentUrl.searchParams.set('q', latitude + ',' + longitude);
+  try { return { ...forecast, current: (await json(currentUrl)).current }; }
+  catch { return { ...forecast, current: null }; }
+}
+function validNwsHourly(periods) {
+  if (!Array.isArray(periods)) return false;
+  const future = periods.filter(p => Date.parse(p.endTime) > Date.now());
+  return future.length >= 24 && future.slice(0,24).every(p => Number.isFinite(p.temperature) && p.shortForecast);
+}
+function validWeatherApiHourly(data) {
+  return Array.isArray(data?.forecast?.forecastday) && data.forecast.forecastday.flatMap(d => d.hour || []).filter(h => Date.parse(h.time_epoch * 1000) >= Date.now()).length >= 24;
+}
+
 async function getDashboard(req, res) {
   const { lat, lon } = req.query;
   if (!validateCoords(lat, lon)) return res.status(400).json({ error: 'Valid coordinates required' });
@@ -52,32 +100,24 @@ async function getDashboard(req, res) {
       cachedForecast(hourlyCache, key, hourlyUrl, HOURLY_TTL, forceRefresh),
       cachedForecast(dailyCache, key, dailyUrl, DAILY_TTL, forceRefresh),
       json(currentUrl),
-      (async () => {
-        const headers = { 'User-Agent': 'RandellDawson-weather (weather.randelldawson.com)', Accept: 'application/geo+json' };
-        const point = await json('https://api.weather.gov/points/' + latitude.toFixed(4) + ',' + longitude.toFixed(4), headers);
-        const stations = await json(point.properties.observationStations, headers);
-        const station = stations.features?.[0];
-        if (!station) return null;
-        const observation = await json(station.id + '/observations/latest', headers);
-        return { station: { id: station.id, name: station.properties.name, coordinates: station.geometry.coordinates }, observation: observation.properties };
-      })(),
-      (async () => {
-        if (!process.env.WEATHERAPI_KEY) return null;
-        const url = new URL('https://api.weatherapi.com/v1/current.json');
-        url.searchParams.set('key', process.env.WEATHERAPI_KEY);
-        url.searchParams.set('q', latitude + ',' + longitude);
-        return json(url);
-      })()
+      getNws(latitude, longitude, key, forceRefresh),
+      getWeatherApi(latitude, longitude, key, forceRefresh)
     ]);
     if (hourlyResult.status !== 'fulfilled') throw hourlyResult.reason;
     if (dailyResult.status !== 'fulfilled') throw dailyResult.reason;
     if (currentResult.status !== 'fulfilled') throw currentResult.reason;
+    const nws = nwsResult.status === 'fulfilled' ? nwsResult.value : null;
+    const weatherapi = weatherApiResult.status === 'fulfilled' ? weatherApiResult.value : null;
+    const currentSource = usableObservation(nws?.selected?.observation) ? 'NWS' : Number.isFinite(weatherapi?.current?.temp_f) ? 'WeatherAPI.com' : 'Open-Meteo';
+    const hourlySource = validNwsHourly(nws?.hourly) ? 'NWS' : validWeatherApiHourly(weatherapi) ? 'WeatherAPI.com' : 'Open-Meteo';
     const data = {
       coordinates: { latitude, longitude },
       forecast: { ...dailyResult.value, hourly: hourlyResult.value.hourly, current: currentResult.value.current },
-      nws: nwsResult.status === 'fulfilled' ? nwsResult.value : null,
-      weatherapi: weatherApiResult.status === 'fulfilled' ? weatherApiResult.value?.current || null : null,
-      sources: { forecast: 'Open-Meteo', station: 'NWS', current: process.env.WEATHERAPI_KEY ? 'WeatherAPI.com' : 'Open-Meteo' },
+      nws: nws?.selected || null,
+      nwsHourly: hourlySource === 'NWS' ? nws.hourly : null,
+      weatherapi: weatherapi?.current || null,
+      weatherapiHourly: hourlySource === 'WeatherAPI.com' ? weatherapi.forecast.forecastday.flatMap(d => d.hour || []) : null,
+      sources: { forecast: 'Open-Meteo', hourly: hourlySource, station: 'NWS', current: currentSource },
       fetchedAt: new Date().toISOString()
     };
     // Bound cache memory in the single-process deployment.
