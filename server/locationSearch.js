@@ -99,7 +99,7 @@ async function lookup(query) {
   }
   // Reserve slots for airports even when many towns share the searched name.
   // Keep a single ungrouped suggestion list, with populated places first.
-  return [...cities.slice(0, 5), ...airports.slice(0, 3)].slice(0, 8);
+  return [...cities.slice(0, 12), ...airports.slice(0, 8)].slice(0, 20);
 }
 function queryParam(req) { return typeof req.query.q === 'string' ? req.query.q.trim() : ''; }
 async function searchLocations(req, res) {
