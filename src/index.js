@@ -324,6 +324,10 @@ async function findLocations(q) {
   return data.results || [];
 }
 async function chooseLocation(place) {
+  // Invalidate any pending autocomplete request before it can overwrite selection.
+  clearTimeout(searchTimer);
+  searchSequence++;
+  selectedSuggestion = place;
   $('location-message').textContent = '';
   clearSuggestions();
   const success = await load(place.lat, place.lon, place);
@@ -368,7 +372,7 @@ $('location-form').addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(searchTimer); searchSequence++;
   const q = queryInput.value.trim();
   if (!q) { $('location-message').textContent = 'Enter a U.S. city or five-digit ZIP code.'; return; }
-  if (selectedSuggestion) { await chooseLocation(selectedSuggestion); return; }
+  if (selectedSuggestion && q === locationLabel(selectedSuggestion)) { await chooseLocation(selectedSuggestion); return; }
   if (/^\d+$/.test(q) && !/^\d{5}$/.test(q)) { $('location-message').textContent = 'Enter a five-digit U.S. ZIP code.'; return; }
   if (q.length < 3) { $('location-message').textContent = 'Enter at least three letters of a city name.'; return; }
   try {
