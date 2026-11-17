@@ -92,40 +92,53 @@ function render(data) {
     ['Feels like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],
     ['Humidity',obsMetric('relativeHumidity',x=>x,'%',val(w?.humidity ?? c.relative_humidity_2m,'%'))],
     ['Wind',obsMetric('windSpeed',x=>x*2.236936,' mph',val(w?.wind_mph ?? c.wind_speed_10m,' mph'))],
-    ['Gust',obsMetric('windGust',x=>x*2.236936,' mph',val(w?.gust_mph,' mph'))],
+    ['Gust',obsMetric('windGust',x=>x*2.236936,' mph',val(w?.gust_mph ?? c.wind_gusts_10m,' mph'))],
     ['Dew point',obsMetric('dewpoint',x=>x*9/5+32,'°F',val(w?.dewpoint_f,'°F'))],
-    ['Pressure',obsMetric('barometricPressure',x=>x/3386.389,' inHg',val(w?.pressure_in,' inHg'))],
+    ['Pressure',obsMetric('barometricPressure',x=>x/3386.389,' inHg',val(w?.pressure_in ?? (Number.isFinite(c.surface_pressure) ? Math.round(c.surface_pressure * 0.0295299830714 * 100) / 100 : null),' inHg'))],
     ['Cloud cover',val(c.cloud_cover,'%')]
   ].forEach(([a,b])=>m.append(metric(a,b)));
   const h=$('hourly');h.replaceChildren();
   const hourlySource=data.sources.hourly;
   const title=document.querySelector('.panel h2');
   if (title) title.textContent='Next 24 hours · '+hourlySource;
-  function addHour(time, temp, description, chance, symbol, isDay) {
+  function compass(degrees) {
+    return Number.isFinite(degrees) ? ['N','NE','E','SE','S','SW','W','NW'][Math.round(((degrees % 360) + 360) % 360 / 45) % 8] : null;
+  }
+  function addHour(time, temp, description, chance, symbol, isDay, windSpeed, windDirection, windGust) {
     card(h,'hour',[['small',time],['strong',val(Math.round(temp),'°')],['small',description],['small',val(chance,'% rain')]]);
     const hour=h.lastElementChild;
     const icon=iconNode(0,isDay);
     icon.textContent=symbol;
     icon.setAttribute('aria-label',description);
     hour.insertBefore(icon,hour.children[1]);
+    const wind=document.createElement('div');
+    wind.className='hour-wind';
+    const speedText=windSpeed == null || windSpeed === '' ? '—' : (typeof windSpeed === 'number' ? Math.round(windSpeed)+' mph' : windSpeed);
+    const directionText=windDirection ? windDirection+' ' : '';
+    const speed=document.createElement('span');
+    speed.textContent='Wind: '+directionText+speedText;
+    const gust=document.createElement('span');
+    gust.textContent='Gusts: '+(Number.isFinite(windGust) ? Math.round(windGust)+' mph' : '—');
+    wind.append(speed,gust);
+    hour.append(wind);
   }
   if (hourlySource==='NWS') {
     data.nwsHourly.filter(p=>Date.parse(p.endTime)>Date.now()).slice(0,24).forEach(p=>{
       const time=new Date(p.startTime).toLocaleTimeString('en-US',{hour:'numeric'});
       const description=p.shortForecast || 'Variable conditions';
-      addHour(time,p.temperatureUnit==='C'?p.temperature*9/5+32:p.temperature,description,p.probabilityOfPrecipitation?.value ?? null,nwsConditionIcon(description,p.isDaytime),p.isDaytime);
+      addHour(time,p.temperatureUnit==='C'?p.temperature*9/5+32:p.temperature,description,p.probabilityOfPrecipitation?.value ?? null,nwsConditionIcon(description,p.isDaytime),p.isDaytime,p.windSpeed,p.windDirection,null);
     });
   } else if (hourlySource==='WeatherAPI.com') {
     data.weatherapiHourly.filter(p=>p.time_epoch*1000>=Date.now()-3600000).slice(0,24).forEach(p=>{
       const description=p.condition?.text || 'Variable conditions';
-      addHour(new Date(p.time_epoch*1000).toLocaleTimeString('en-US',{hour:'numeric'}),p.temp_f,description,p.chance_of_rain ?? null,nwsConditionIcon(description,p.is_day===1),p.is_day===1);
+      addHour(new Date(p.time_epoch*1000).toLocaleTimeString('en-US',{hour:'numeric'}),p.temp_f,description,p.chance_of_rain ?? null,nwsConditionIcon(description,p.is_day===1),p.is_day===1,p.wind_mph,p.wind_dir,p.gust_mph);
     });
   } else {
     const times=f.hourly.time;let start=times.findIndex(t=>t>=c.time.slice(0,13)+':00');if(start<0)start=0;
     for(let i=start;i<Math.min(start+24,times.length);i++){
       const date=new Date(times[i]+'Z');
       const description=codeText(f.hourly.weather_code[i]);
-      addHour(new Intl.DateTimeFormat('en-US',{hour:'numeric',timeZone:'UTC'}).format(date),f.hourly.temperature_2m[i],description,f.hourly.precipitation_probability[i],weatherIcon(f.hourly.weather_code[i],f.hourly.is_day?.[i]!==0),f.hourly.is_day?.[i]!==0);
+      addHour(new Intl.DateTimeFormat('en-US',{hour:'numeric',timeZone:'UTC'}).format(date),f.hourly.temperature_2m[i],description,f.hourly.precipitation_probability[i],weatherIcon(f.hourly.weather_code[i],f.hourly.is_day?.[i]!==0),f.hourly.is_day?.[i]!==0,f.hourly.wind_speed_10m?.[i],compass(f.hourly.wind_direction_10m?.[i]),f.hourly.wind_gusts_10m?.[i]);
     }
   }
   const d=$('daily');d.replaceChildren();
