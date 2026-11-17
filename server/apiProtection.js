@@ -44,4 +44,12 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests. Please try again later.' }
 });
 
-module.exports = { restrictOrigin, apiLimiter };
+const searchLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 240,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Too many location searches. Please try again later.' }
+});
+
+module.exports = { restrictOrigin, apiLimiter, searchLimiter };
