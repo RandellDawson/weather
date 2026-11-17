@@ -1,5 +1,5 @@
 const ZIP_RE = /^\d{5}$/;
-const CITY_RE = /^[\p{L}\p{M} .'-]{3,80}$/u;
+const CITY_RE = /^[\p{L}\p{M} .,'-]{3,80}$/u;
 const timeout = 8000;
 async function readJson(url) {
   const response = await fetch(url, { signal: AbortSignal.timeout(timeout), headers: { Accept: 'application/json' } });
@@ -23,9 +23,15 @@ async function lookup(query) {
     })).filter(Boolean).slice(0, 8);
   }
   if (!CITY_RE.test(q)) return [];
+  // The search box may contain a previously selected 'City, State' label.
+  // Search by city while retaining the state portion for result filtering.
+  const [cityPart, ...regionParts] = q.split(',');
+  const cityQuery = cityPart.trim();
+  const regionQuery = regionParts.join(',').trim().toLowerCase();
+  if (cityQuery.length < 3) return [];
   // Search common U.S. place-name spellings without requiring exact punctuation.
   // Limit variants to keep geocoding requests predictable.
-  const names = new Set([q, q.replace(/\./g, '').replace(/\s+/g, ' ').trim()]);
+  const names = new Set([cityQuery, cityQuery.replace(/\./g, '').replace(/\s+/g, ' ').trim()]);
   const aliases = [
     [/^st\.?\s+/i, 'Saint '], [/^saint\s+/i, 'St '],
     [/^ft\.?\s+/i, 'Fort '], [/^fort\s+/i, 'Ft '],
@@ -51,7 +57,7 @@ async function lookup(query) {
   }
   // A geocoder may not index a multiword partial phrase such as "st geor".
   // Also search the final word as a prefix and filter matches below.
-  const trailingWord = q.split(/\s+/).at(-1);
+  const trailingWord = cityQuery.split(/\s+/).at(-1);
   const queries = [...new Set([...names, ...airportNames, ...(trailingWord.length >= 3 ? [trailingWord] : [])])].slice(0, 17);
   const responses = await Promise.all(queries.map(async name => {
     const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
@@ -64,7 +70,7 @@ async function lookup(query) {
   const normalizeTerms = value => String(value).toLowerCase()
     .replace(/\bst\.?\b/g, 'saint').replace(/\bft\.?\b/g, 'fort')
     .replace(/\bmt\.?\b/g, 'mount').replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/);
-  const requestedTerms = normalizeTerms(q).filter(word =>
+  const requestedTerms = normalizeTerms(cityQuery).filter(word =>
     !['airport', 'municipal', 'regional', 'airfield', 'airstrip'].includes(word));
   const matchesQuery = name => {
     const terms = new Set(normalizeTerms(name));
@@ -77,6 +83,7 @@ async function lookup(query) {
   for (const data of responses) {
     for (const r of data?.results || []) {
       if (r.country_code !== 'US') continue;
+      if (regionQuery && !String(r.admin1 || '').toLowerCase().startsWith(regionQuery)) continue;
       // Include populated places and clearly named airports in the same list.
       // Other geographic features can produce misleading city-search matches.
       const airport = /\b(?:airport|airfield|airstrip)\b/i.test(r.name) || /^AIR/i.test(r.feature_code || '');
