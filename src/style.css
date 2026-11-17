@@ -72,3 +72,8 @@
 .hour-description{flex:1 1 auto}
 .hour-precipitation{flex:0 0 auto}
 .hour-wind{flex:0 0 auto;margin-top:12px}
+
+/* Footer attribution uses the same legible palette as the dashboard. */
+#source{display:block;margin:20px 0 0;line-height:1.6}
+#source a{color:#91cdff;text-decoration:underline;text-underline-offset:2px}
+:root[data-theme="day"] #source a{color:#1468ae}
