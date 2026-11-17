@@ -2,3 +2,24 @@
 #locate{min-height:44px;white-space:nowrap;touch-action:manipulation}#locate:disabled{opacity:.65;cursor:wait}@media(max-width:650px){#locate{width:100%;position:sticky;top:8px;z-index:5;box-shadow:0 5px 20px #071325aa}}
 
 .current-reading{display:flex;align-items:center;gap:16px}.weather-icon{display:inline-block;font-size:2.1rem;line-height:1.25;vertical-align:middle}.current-reading .weather-icon{font-size:clamp(3rem,6vw,4.5rem)}.hour .weather-icon{display:block;margin:12px auto 4px}.day .weather-icon{display:block;margin:8px 0}
+
+/* Sunrise/sunset-driven day palette. Night retains the existing dark design. */
+:root[data-theme="day"] {
+  color-scheme:light;
+  background:#eef5fb;
+  color:#172c42;
+}
+:root[data-theme="day"] body { background:#eef5fb; color:#172c42; }
+:root[data-theme="day"] .hero,
+:root[data-theme="day"] .panel {background:#fff;border-color:#cbd9e6;box-shadow:0 4px 18px #183a5710}
+:root[data-theme="day"] .metric,
+:root[data-theme="day"] .hour,
+:root[data-theme="day"] .day {background:#eaf2f9}
+:root[data-theme="day"] p {color:#42576c}
+:root[data-theme="day"] .eyebrow {color:#235d92}
+:root[data-theme="day"] .metric small,
+:root[data-theme="day"] label {color:#4b6279}
+:root[data-theme="day"] footer {color:#53697f}
+:root[data-theme="day"] button {background:#1468ae;color:#fff}
+:root[data-theme="day"] button:hover {background:#09518b}
+:root[data-theme="day"] input {background:#fff;color:#172c42;border-color:#9fb6cc}
