@@ -298,13 +298,12 @@ function rememberLocation(place) {
 function clearSuggestions() {
   suggestions = []; activeSuggestion = -1;
   $('location-suggestions').replaceChildren(); $('location-suggestions').hidden = true;
+  $('location-suggestions').scrollTop = 0;
   $('location-query').setAttribute('aria-expanded','false');
 }
 function showSuggestions(items) {
   suggestions = items; activeSuggestion = -1;
   const list = $('location-suggestions'); list.replaceChildren();
-  // A new query must start at the first result, even after scrolling a prior list.
-  list.scrollTop = 0;
   items.forEach((place, index) => {
     const item = document.createElement('button'); item.type = 'button'; item.className = 'location-option';
     item.setAttribute('role','option'); item.id = 'location-option-' + index;
@@ -312,7 +311,11 @@ function showSuggestions(items) {
     item.addEventListener('click', () => { selectedSuggestion = place; $('location-query').value = locationLabel(place); clearSuggestions(); chooseLocation(place); });
     list.append(item);
   });
-  list.hidden = !items.length; $('location-query').setAttribute('aria-expanded', String(!!items.length));
+  list.hidden = !items.length;
+  // Reset only after the list is visible and populated; browsers can restore
+  // the previous scroll offset when a previously hidden element is shown.
+  list.scrollTop = 0;
+  $('location-query').setAttribute('aria-expanded', String(!!items.length));
 }
 async function findLocations(q) {
   const response = await fetch('/api/locations/search?' + new URLSearchParams({q}), {cache:'no-store'});
