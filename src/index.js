@@ -238,6 +238,7 @@ function render(data) {
 const RECENT_KEY = 'weather-recent-locations-v1';
 let suggestions = [], selectedSuggestion = null, activeSuggestion = -1, searchTimer = null, searchSequence = 0;
 function locationLabel(place) { return place.name + (place.region ? ', ' + place.region : ''); }
+function suggestionLabel(place) { return place.zip ? place.zip + ' — ' + locationLabel(place) : locationLabel(place); }
 const US_STATES = {
   AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',
   DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',
@@ -302,7 +303,7 @@ function showSuggestions(items) {
   items.forEach((place, index) => {
     const item = document.createElement('button'); item.type = 'button'; item.className = 'location-option';
     item.setAttribute('role','option'); item.id = 'location-option-' + index;
-    item.textContent = locationLabel(place);
+    item.textContent = suggestionLabel(place);
     item.addEventListener('click', () => { selectedSuggestion = place; $('location-query').value = locationLabel(place); clearSuggestions(); chooseLocation(place); });
     list.append(item);
   });
@@ -327,14 +328,14 @@ queryInput.addEventListener('input', () => {
   clearTimeout(searchTimer); searchSequence++;
   const q = queryInput.value.trim();
   clearSuggestions(); $('location-message').textContent = '';
-  if (q.length < 3 || /^\d+$/.test(q)) return;
+  if (q.length < 3 || (/^\d+$/.test(q) && q.length !== 5)) return;
   const seq = searchSequence;
   searchTimer = setTimeout(async () => {
     try {
       const results = await findLocations(q);
       if (seq !== searchSequence) return;
       showSuggestions(results);
-      if (!results.length) $('location-message').textContent = 'No matching U.S. cities found.';
+      if (!results.length) $('location-message').textContent = /^\d{5}$/.test(q) ? 'ZIP code not found.' : 'No matching U.S. cities found.';
     } catch (error) { if (seq === searchSequence) $('location-message').textContent = error.message; }
   }, 300);
 });
@@ -360,8 +361,8 @@ $('location-form').addEventListener('submit', async event => {
   try {
     const results = await findLocations(q);
     if (!results.length) { $('location-message').textContent = 'No matching U.S. city or ZIP code found.'; return; }
-    if (results.length === 1 || /^\d{5}$/.test(q)) await chooseLocation(results[0]);
-    else { showSuggestions(results); $('location-message').textContent = 'Select a city from the suggestions.'; }
+    showSuggestions(results);
+    $('location-message').textContent = /^\d{5}$/.test(q) ? 'Select the matching ZIP code location.' : 'Select a city from the suggestions.';
   } catch (error) { $('location-message').textContent = error.message; }
 });
 renderRecents();
