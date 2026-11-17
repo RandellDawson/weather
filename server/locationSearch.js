@@ -53,9 +53,11 @@ async function lookup(query) {
   for (const data of responses) {
     for (const r of data?.results || []) {
       if (r.country_code !== 'US') continue;
-      // GeoNames PPL* entries are populated places; AIR* entries are airports.
-      if (r.feature_code && !/^PPL/i.test(r.feature_code)) continue;
-      if (/\b(?:airport|airfield|airstrip)\b/i.test(r.name)) continue;
+      // Include populated places and clearly named airports in the same list.
+      // Other geographic features can produce misleading city-search matches.
+      const airport = /\b(?:airport|airfield|airstrip)\b/i.test(r.name) || /^AIR/i.test(r.feature_code || '');
+      const populated = !r.feature_code || /^PPL/i.test(r.feature_code);
+      if (!airport && !populated) continue;
       const place = normalize({
         id: 'city:' + r.id, name: r.name, region: r.admin1,
         latitude: r.latitude, longitude: r.longitude
@@ -65,7 +67,8 @@ async function lookup(query) {
       results.push(place);
     }
   }
-  return results.slice(0, 8);
+  // Cities first, airports afterward; names distinguish them without headings.
+  return results.sort((a, b) => Number(/\b(?:airport|airfield|airstrip)\b/i.test(a.name)) - Number(/\b(?:airport|airfield|airstrip)\b/i.test(b.name))).slice(0, 8);
 }
 function queryParam(req) { return typeof req.query.q === 'string' ? req.query.q.trim() : ''; }
 async function searchLocations(req, res) {
