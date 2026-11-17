@@ -41,7 +41,6 @@ function metric(label, value) { const box=document.createElement('div');box.clas
 function card(parent, className, values) { const box=document.createElement('div');box.className=className;for(const [tag,text] of values){const node=document.createElement(tag);node.textContent=text;box.append(node);}parent.append(box); }
 function render(data) {
   const f=data.forecast, c=f.current, w=data.weatherapi;
-  $('location').textContent=data.coordinates.latitude.toFixed(5)+', '+data.coordinates.longitude.toFixed(5)+' · '+f.timezone;
   const station=data.nws;
   const obs=station?.observation;
   const observedAt=obs?.timestamp ? Date.parse(obs.timestamp) : NaN;
@@ -125,7 +124,7 @@ function locate() {
   const button = $('locate');
   button.disabled = true;
   button.textContent = 'Updating…';
-  const finish = () => { button.disabled = false; button.textContent = '↻ Refresh location'; };
+  const finish = () => { button.disabled = false; button.textContent = '↻ Refresh'; };
   if (!navigator.geolocation) {
     $('status').textContent='Your browser does not support geolocation.';
     finish();
