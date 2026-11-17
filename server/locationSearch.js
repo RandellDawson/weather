@@ -23,13 +23,24 @@ async function lookup(query) {
     })).filter(Boolean).slice(0, 8);
   }
   if (!CITY_RE.test(q)) return [];
-  // Geocoding matches airports and other named features as well as cities.
-  // Try both common spellings of Saint/St. so searches such as "st george"
-  // can find "Saint George" without showing airport-only results.
-  const names = [q];
-  if (/^st\.?\s+/i.test(q)) names.push(q.replace(/^st\.?\s+/i, 'Saint '));
-  else if (/^saint\s+/i.test(q)) names.push(q.replace(/^saint\s+/i, 'St '));
-  const responses = await Promise.all(names.map(async name => {
+  // Search common U.S. place-name spellings without requiring exact punctuation.
+  // Limit variants to keep geocoding requests predictable.
+  const names = new Set([q, q.replace(/\./g, '').replace(/\s+/g, ' ').trim()]);
+  const aliases = [
+    [/^st\.?\s+/i, 'Saint '], [/^saint\s+/i, 'St '],
+    [/^ft\.?\s+/i, 'Fort '], [/^fort\s+/i, 'Ft '],
+    [/^mt\.?\s+/i, 'Mount '], [/^mount\s+/i, 'Mt ']
+  ];
+  for (const name of [...names]) {
+    for (const [pattern, replacement] of aliases) {
+      if (pattern.test(name)) {
+        const alternate = name.replace(pattern, replacement);
+        names.add(alternate);
+        names.add(alternate.replace(/\./g, ''));
+      }
+    }
+  }
+  const responses = await Promise.all([...names].map(async name => {
     const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
     url.searchParams.set('name', name);
     url.searchParams.set('count', '20');
