@@ -143,9 +143,14 @@ function render(data) {
     }
   }
   const d=$('daily');d.replaceChildren();
+  const dailyWindDirection = degrees => Number.isFinite(degrees)
+    ? ['N','NE','E','SE','S','SW','W','NW'][Math.round((((degrees % 360)+360)%360)/45)%8]
+    : '—';
   f.daily.time.forEach((date,i) => {
     const row=document.createElement('div');
     row.className='day';
+    const top=document.createElement('div');
+    top.className='day-top';
     const dateLabel=document.createElement('time');
     dateLabel.dateTime=date;
     dateLabel.className='day-date';
@@ -158,10 +163,23 @@ function render(data) {
     const temperatures=document.createElement('strong');
     temperatures.className='day-temperatures';
     temperatures.textContent=Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°';
+    top.append(dateLabel,condition,temperatures);
+    const bottom=document.createElement('div');
+    bottom.className='day-details';
     const precipitation=document.createElement('span');
     precipitation.className='day-precipitation';
-    precipitation.textContent=val(f.daily.precipitation_probability_max[i],'% rain');
-    row.append(dateLabel,condition,temperatures,precipitation);
+    precipitation.textContent='💧 '+val(f.daily.precipitation_probability_max[i],'% rain');
+    const wind=document.createElement('span');
+    wind.className='day-wind';
+    const maxWind=f.daily.wind_speed_10m_max?.[i];
+    const direction=dailyWindDirection(f.daily.wind_direction_10m_dominant?.[i]);
+    wind.textContent='Wind max: '+direction+' '+(Number.isFinite(maxWind)?Math.round(maxWind)+' mph':'—');
+    const gust=document.createElement('span');
+    gust.className='day-gust';
+    const maxGust=f.daily.wind_gusts_10m_max?.[i];
+    gust.textContent='Gusts max: '+(Number.isFinite(maxGust)?Math.round(maxGust)+' mph':'—');
+    bottom.append(precipitation,wind,gust);
+    row.append(top,bottom);
     d.append(row);
   });
   $('station').textContent=obs ? station.station.name+': '+(obs.temperature?.value==null?'Temperature unavailable':(obs.temperature.value*9/5+32).toFixed(1)+'°F')+' · observed '+(obs.timestamp||'unknown time')+(useNws?' · Used for current conditions':' · Not used for current conditions (missing or stale temperature)') : 'No current NWS station observation available for these coordinates.';
