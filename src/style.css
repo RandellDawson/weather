@@ -62,3 +62,6 @@
 .hour-description,.hour-precipitation{display:block;line-height:1.45}
 .hour-description{margin-top:6px}
 .hour-precipitation{margin-top:5px}
+
+/* Forecast provider details below the current-conditions source. */
+.source-detail{display:block;margin-top:4px}
