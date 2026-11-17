@@ -29,9 +29,12 @@ async function lookup(query) {
   const cityQuery = cityPart.trim();
   const regionQuery = regionParts.join(',').trim().toLowerCase();
   if (cityQuery.length < 3) return [];
+  // Expand a partially typed airport suffix before querying the geocoder.
+  const airportIntent = /\s+(?:airp|airpo|airpor|airport)$/i.test(cityQuery);
+  const lookupCity = airportIntent ? cityQuery.replace(/\s+airp(?:o(?:r(?:t)?)?)?$/i, ' Airport') : cityQuery;
   // Search common U.S. place-name spellings without requiring exact punctuation.
   // Limit variants to keep geocoding requests predictable.
-  const names = new Set([cityQuery, cityQuery.replace(/\./g, '').replace(/\s+/g, ' ').trim()]);
+  const names = new Set([lookupCity, lookupCity.replace(/\./g, '').replace(/\s+/g, ' ').trim()]);
   const aliases = [
     [/^st\.?\s+/i, 'Saint '], [/^saint\s+/i, 'St '],
     [/^ft\.?\s+/i, 'Fort '], [/^fort\s+/i, 'Ft '],
@@ -57,7 +60,7 @@ async function lookup(query) {
   }
   // A geocoder may not index a multiword partial phrase such as "st geor".
   // Also search the final word as a prefix and filter matches below.
-  const trailingWord = cityQuery.split(/\s+/).at(-1);
+  const trailingWord = lookupCity.split(/\s+/).at(-1);
   const queries = [...new Set([...names, ...airportNames, ...(trailingWord.length >= 3 ? [trailingWord] : [])])].slice(0, 17);
   const responses = await Promise.all(queries.map(async name => {
     const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
@@ -70,7 +73,7 @@ async function lookup(query) {
   const normalizeTerms = value => String(value).toLowerCase()
     .replace(/\bst\.?\b/g, 'saint').replace(/\bft\.?\b/g, 'fort')
     .replace(/\bmt\.?\b/g, 'mount').replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/);
-  const requestedTerms = normalizeTerms(cityQuery).filter(word =>
+  const requestedTerms = normalizeTerms(lookupCity).filter(word =>
     !['airport', 'municipal', 'regional', 'airfield', 'airstrip'].includes(word));
   const matchesQuery = name => {
     const terms = new Set(normalizeTerms(name));
@@ -89,6 +92,7 @@ async function lookup(query) {
       const airport = /\b(?:airport|airfield|airstrip)\b/i.test(r.name) || /^AIR/i.test(r.feature_code || '');
       const populated = !r.feature_code || /^PPL/i.test(r.feature_code);
       if (!airport && !populated) continue;
+      if (airportIntent && !airport) continue;
       if (!matchesQuery(r.name)) continue;
       const place = normalize({
         id: 'city:' + r.id, name: r.name, region: r.admin1,
