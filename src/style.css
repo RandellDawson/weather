@@ -57,3 +57,8 @@
 
 /* Put the NWS observation timestamp below the station name. */
 .source-timestamp{display:block;margin-top:4px}
+
+/* Keep hourly weather descriptions and precipitation percentages on distinct lines. */
+.hour-description,.hour-precipitation{display:block;line-height:1.45}
+.hour-description{margin-top:6px}
+.hour-precipitation{margin-top:5px}
