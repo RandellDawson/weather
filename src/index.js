@@ -69,6 +69,9 @@ function setSolarSchedule(forecast) {
 
 function render(data) {
   setSolarSchedule(data.forecast);
+  const city=data.location?.city?.trim();
+  const region=data.location?.region?.trim();
+  $('current-city').textContent=city ? city + (region ? ', ' + region : '') : 'Current Location';
   const f=data.forecast, c=f.current, w=data.weatherapi;
   const station=data.nws;
   const obs=station?.observation;
