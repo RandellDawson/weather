@@ -129,7 +129,27 @@ function render(data) {
     }
   }
   const d=$('daily');d.replaceChildren();
-  f.daily.time.forEach((date,i)=>{card(d,'day',[['small',date],['strong',Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°'],['span',codeText(f.daily.weather_code[i])],['p',val(f.daily.precipitation_probability_max[i],'% rain')]]);const day=d.lastElementChild;day.insertBefore(iconNode(f.daily.weather_code[i]),day.children[1]);});
+  f.daily.time.forEach((date,i) => {
+    const row=document.createElement('div');
+    row.className='day';
+    const dateLabel=document.createElement('time');
+    dateLabel.dateTime=date;
+    dateLabel.className='day-date';
+    dateLabel.textContent=new Date(date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'});
+    const condition=document.createElement('div');
+    condition.className='day-condition';
+    const description=document.createElement('span');
+    description.textContent=codeText(f.daily.weather_code[i]);
+    condition.append(iconNode(f.daily.weather_code[i]),description);
+    const temperatures=document.createElement('strong');
+    temperatures.className='day-temperatures';
+    temperatures.textContent=Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°';
+    const precipitation=document.createElement('span');
+    precipitation.className='day-precipitation';
+    precipitation.textContent=val(f.daily.precipitation_probability_max[i],'% rain');
+    row.append(dateLabel,condition,temperatures,precipitation);
+    d.append(row);
+  });
   $('station').textContent=obs ? station.station.name+': '+(obs.temperature?.value==null?'Temperature unavailable':(obs.temperature.value*9/5+32).toFixed(1)+'°F')+' · observed '+(obs.timestamp||'unknown time')+(useNws?' · Used for current conditions':' · Not used for current conditions (missing or stale temperature)') : 'No current NWS station observation available for these coordinates.';
 }
 const REFRESH_MS = 15 * 60 * 1000;
