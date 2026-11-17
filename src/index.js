@@ -238,10 +238,37 @@ function render(data) {
 const RECENT_KEY = 'weather-recent-locations-v1';
 let suggestions = [], selectedSuggestion = null, activeSuggestion = -1, searchTimer = null, searchSequence = 0;
 function locationLabel(place) { return place.name + (place.region ? ', ' + place.region : ''); }
+const US_STATES = {
+  AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',
+  DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',
+  IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',
+  MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',
+  NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',
+  NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',
+  RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',
+  VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'
+};
+function normalizedPlaceKey(place) {
+  const normalize = value => String(value || '').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const state = String(place.region || '').trim();
+  const fullState = US_STATES[state.toUpperCase()] || state;
+  return normalize(place.name) + ':' + normalize(fullState);
+}
+function samePlace(a, b) {
+  return a.id === b.id || normalizedPlaceKey(a) === normalizedPlaceKey(b) ||
+    (Math.abs(a.lat - b.lat) < 0.015 && Math.abs(a.lon - b.lon) < 0.015);
+}
 function recentLocations() {
   try {
     const saved = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
-    return Array.isArray(saved) ? saved.filter(p => p && typeof p.id === 'string' && Number.isFinite(p.lat) && Number.isFinite(p.lon)).slice(0,4) : [];
+    if (!Array.isArray(saved)) return [];
+    const unique = [];
+    for (const place of saved) {
+      if (!place || typeof place.id !== 'string' || !Number.isFinite(place.lat) || !Number.isFinite(place.lon)) continue;
+      if (!unique.some(existing => samePlace(existing, place))) unique.push(place);
+      if (unique.length === 4) break;
+    }
+    return unique;
   } catch { return []; }
 }
 function saveRecents(items) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0,4))); } catch {} renderRecents(); }
@@ -261,9 +288,8 @@ function renderRecents() {
   }
 }
 function rememberLocation(place) {
-  // Coordinate proximity also deduplicates city and ZIP searches resolving to the same place.
-  const same = p => p.id === place.id || (Math.abs(p.lat - place.lat) < 0.015 && Math.abs(p.lon - place.lon) < 0.015);
-  saveRecents([place, ...recentLocations().filter(p => !same(p))]);
+  // City and ZIP searches can resolve to different coordinates or state formats.
+  saveRecents([place, ...recentLocations().filter(p => !samePlace(p, place))]);
 }
 function clearSuggestions() {
   suggestions = []; activeSuggestion = -1;
