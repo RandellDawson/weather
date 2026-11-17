@@ -49,13 +49,20 @@ async function getWeatherApi(latitude, longitude, key, forceRefresh) {
   url.searchParams.set('days', '2');
   url.searchParams.set('aqi', 'no');
   url.searchParams.set('alerts', 'no');
-  const forecast = await cachedForecast(hourlyCache, 'weatherapi:' + key, url, HOURLY_TTL, forceRefresh);
-  // Current observations must not inherit the 30-minute hourly forecast cache.
+  // Fetch current independently: forecast entitlement/errors must not suppress current metrics.
   const currentUrl = new URL('https://api.weatherapi.com/v1/current.json');
   currentUrl.searchParams.set('key', process.env.WEATHERAPI_KEY);
   currentUrl.searchParams.set('q', latitude + ',' + longitude);
-  try { return { ...forecast, current: (await json(currentUrl)).current }; }
-  catch { return { ...forecast, current: null }; }
+  const [forecast, current] = await Promise.allSettled([
+    cachedForecast(hourlyCache, 'weatherapi:' + key, url, HOURLY_TTL, forceRefresh),
+    json(currentUrl)
+  ]);
+  if (forecast.status === 'rejected') console.warn('WeatherAPI forecast unavailable:', forecast.reason.message);
+  if (current.status === 'rejected') console.warn('WeatherAPI current unavailable:', current.reason.message);
+  return {
+    ...(forecast.status === 'fulfilled' ? forecast.value : {}),
+    current: current.status === 'fulfilled' ? current.value.current : null
+  };
 }
 function validNwsHourly(periods) {
   if (!Array.isArray(periods)) return false;
@@ -95,7 +102,7 @@ async function getDashboard(req, res) {
     currentUrl.searchParams.delete('hourly');
     currentUrl.searchParams.delete('daily');
     currentUrl.searchParams.delete('forecast_days');
-    currentUrl.searchParams.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,is_day');
+    currentUrl.searchParams.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,surface_pressure,wind_direction_10m,is_day');
     const [hourlyResult, dailyResult, currentResult, nwsResult, weatherApiResult] = await Promise.allSettled([
       cachedForecast(hourlyCache, key, hourlyUrl, HOURLY_TTL, forceRefresh),
       cachedForecast(dailyCache, key, dailyUrl, DAILY_TTL, forceRefresh),
