@@ -20,10 +20,17 @@ function render(data) {
   const station=data.nws;
   $('station').textContent=station?.observation ? station.station.name+': '+(station.observation.temperature?.value==null?'Temperature unavailable':(station.observation.temperature.value*9/5+32).toFixed(1)+'°F')+' · observed '+(station.observation.timestamp||'unknown time') : 'No current NWS station observation available for these coordinates.';
 }
+const REFRESH_MS = 15 * 60 * 1000;
+let lastCoordinates = null;
+let lastSuccessfulRefresh = 0;
+let loading = false;
 async function load(lat,lon) {
+  if (loading) return;
+  loading = true;
   $('status').textContent='Loading weather…';
-  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon}));const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();}
+  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);lastCoordinates={lat,lon};lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();}
   catch(e){$('status').textContent='Unable to load weather: '+e.message;}
+  finally{loading=false;}
 }
 function locate() {
   const button = $('locate');
@@ -50,3 +57,13 @@ function locate() {
 }
 $('locate').addEventListener('click',locate);
 locate();
+
+// Background tabs may throttle timers; catch up when the page becomes visible.
+function refreshIfDue() {
+  if (!document.hidden && lastCoordinates && !loading && Date.now() - lastSuccessfulRefresh >= REFRESH_MS) {
+    load(lastCoordinates.lat,lastCoordinates.lon);
+  }
+}
+setInterval(refreshIfDue, 60 * 1000);
+document.addEventListener('visibilitychange', refreshIfDue);
+window.addEventListener('focus', refreshIfDue);
