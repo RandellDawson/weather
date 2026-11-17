@@ -69,7 +69,6 @@ function setSolarSchedule(forecast) {
 function render(data) {
   setSolarSchedule(data.forecast);
   const f=data.forecast, c=f.current, w=data.weatherapi;
-  $('location').textContent=data.coordinates.latitude.toFixed(5)+', '+data.coordinates.longitude.toFixed(5)+' · '+f.timezone;
   const station=data.nws;
   const obs=station?.observation;
   const observedAt=obs?.timestamp ? Date.parse(obs.timestamp) : NaN;
@@ -153,7 +152,7 @@ function locate() {
   const button = $('locate');
   button.disabled = true;
   button.textContent = 'Updating…';
-  const finish = () => { button.disabled = false; button.textContent = '↻ Refresh location'; };
+  const finish = () => { button.disabled = false; button.textContent = '↻ Refresh'; };
   if (!navigator.geolocation) {
     $('status').textContent='Your browser does not support geolocation.';
     finish();
