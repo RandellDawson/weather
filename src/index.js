@@ -114,10 +114,10 @@ function render(data) {
     dailySourceLabel.append(data.sources.forecast);
   }
   source.append(hourlySourceLabel,dailySourceLabel);
+  $('feels-like').textContent='Feels Like '+val(w?.feelslike_f ?? c.apparent_temperature,'°F');
   const m=$('metrics');m.replaceChildren();
   const obsMetric=(field, convert, unit, fallback) => useNws ? (nwsValue(obs[field]?.value,convert,unit) ?? fallback) : fallback;
   [
-    ['Feels Like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],
     ['Humidity',obsMetric('relativeHumidity',x=>x,'%',val(w?.humidity ?? c.relative_humidity_2m,'%'))],
     ['Wind',obsMetric('windSpeed',x=>x*2.236936,' mph',val(w?.wind_mph ?? c.wind_speed_10m,' mph'))],
     ['Gust',obsMetric('windGust',x=>x*2.236936,' mph',val(w?.gust_mph ?? c.wind_gusts_10m,' mph'))],
