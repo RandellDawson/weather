@@ -3,9 +3,9 @@ const cache = new Map();
 const TTL = 10 * 60 * 1000;
 const FORECAST_TTL = 60 * 60 * 1000;
 const forecastCache = new Map();
-async function cachedForecast(key, url) {
+async function cachedForecast(key, url, forceRefresh = false) {
   const item = forecastCache.get(key);
-  if (item && item.expires > Date.now()) return item.data;
+  if (!forceRefresh && item && item.expires > Date.now()) return item.data;
   const data = await json(url);
   if (forecastCache.size >= 200) forecastCache.delete(forecastCache.keys().next().value);
   forecastCache.set(key, { data, expires: Date.now() + FORECAST_TTL });
@@ -23,9 +23,11 @@ async function getDashboard(req, res) {
   if (latitude < 24 || latitude > 50 || longitude < -125 || longitude > -66) {
     return res.status(400).json({ error: 'First-pass NWS integration supports the contiguous US only' });
   }
+  // Explicit reload bypasses provider caches; existing endpoint rate limits still apply.
+  const forceRefresh = req.query.refresh === '1';
   const key = latitude.toFixed(3) + ',' + longitude.toFixed(3);
   const cached = cache.get(key);
-  if (cached && cached.expires > Date.now()) return res.json(cached.data);
+  if (!forceRefresh && cached && cached.expires > Date.now()) return res.json(cached.data);
   try {
     const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast');
     Object.entries({
@@ -40,7 +42,7 @@ async function getDashboard(req, res) {
     currentUrl.searchParams.delete('forecast_days');
     currentUrl.searchParams.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m');
     const [forecastResult, currentResult, nwsResult, weatherApiResult] = await Promise.allSettled([
-      cachedForecast(key, forecastUrl),
+      cachedForecast(key, forecastUrl, forceRefresh),
       json(currentUrl),
       (async () => {
         const headers = { 'User-Agent': 'RandellDawson-weather (weather.randelldawson.com)', Accept: 'application/geo+json' };
