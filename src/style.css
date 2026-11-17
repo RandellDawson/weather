@@ -113,3 +113,6 @@
 .recent-locations{gap:6px}
 .recent-chip button{padding:5px 8px;font-size:.74rem}
 .recent-chip .recent-remove{padding:5px 7px}
+
+/* Show approximately five autocomplete rows while allowing up to twenty results to scroll. */
+.location-suggestions{max-height:205px;overflow-y:auto}
