@@ -103,3 +103,22 @@ test('recent-location clicks force a fresh dashboard request', () => {
   assert.match(script, /const forceRefresh = reloadPending \|\| requestedRefresh/);
   assert.match(script, /refresh:'1'/);
 });
+
+test('numeric town names remain distinct while accented spelling variants deduplicate', () => {
+  const {context, evaluate} = functions();
+  context.rememberLocation(place('city:town1', 'Town1', 'Utah'));
+  context.rememberLocation(place('city:town2', 'Town2', 'Utah'));
+  assert.equal(evaluate('recentLocations()').length, 2);
+  context.rememberLocation(place('city:cafe1', 'Café', 'Utah'));
+  context.rememberLocation(place('city:cafe2', 'Cafe', 'Utah'));
+  assert.equal(evaluate('recentLocations()').length, 3);
+  assert.equal(evaluate('recentLocations()')[0].id, 'city:cafe2');
+});
+
+test('ordinary city selection does not force refresh, while recent selection does', () => {
+  assert.match(script, /open\.addEventListener\('click', \(\) => chooseLocation\(place, true\)\)/);
+  assert.match(script, /async function chooseLocation\(place, forceRefresh = false\)/);
+  assert.match(script, /const success = await load\(place\.lat, place\.lon, place, forceRefresh\)/);
+  assert.match(script, /const forceRefresh = reloadPending \|\| requestedRefresh/);
+  assert.match(script, /\(forceRefresh\?\{refresh:'1'\}:\{\}\)/);
+});
