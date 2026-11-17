@@ -24,11 +24,15 @@ const REFRESH_MS = 15 * 60 * 1000;
 let lastCoordinates = null;
 let lastSuccessfulRefresh = 0;
 let loading = false;
+// A browser navigation reload triggers one uncached provider fetch.
+let reloadPending = performance.getEntriesByType('navigation').some(entry => entry.type === 'reload');
 async function load(lat,lon) {
   if (loading) return;
   loading = true;
   $('status').textContent='Loading weather…';
-  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);lastCoordinates={lat,lon};lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();}
+  const forceRefresh = reloadPending;
+  reloadPending = false;
+  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);lastCoordinates={lat,lon};lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();}
   catch(e){$('status').textContent='Unable to load weather: '+e.message;}
   finally{loading=false;}
 }
