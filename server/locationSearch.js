@@ -52,7 +52,7 @@ async function lookup(query) {
   // Search airport variants independently; airports often have a different
   // official name from the nearby town and rank poorly in generic searches.
   const airportNames = new Set();
-  for (const name of names) {
+  for (const name of [...names].slice(0, 2)) {
     const base = name.replace(/\s+(?:municipal|regional)?\s*airport$/i, '').trim();
     for (const suffix of ['Airport', 'Municipal Airport', 'Regional Airport']) {
       airportNames.add(base + ' ' + suffix);
@@ -61,7 +61,7 @@ async function lookup(query) {
   // A geocoder may not index a multiword partial phrase such as "st geor".
   // Also search the final word as a prefix and filter matches below.
   const trailingWord = lookupCity.split(/\s+/).at(-1);
-  const queries = [...new Set([...names, ...airportNames, ...(trailingWord.length >= 3 ? [trailingWord] : [])])].slice(0, 17);
+  const queries = [...new Set([...names, ...airportNames, ...(trailingWord.length >= 3 && !airportIntent ? [trailingWord] : [])])].slice(0, 8);
   const responses = await Promise.all(queries.map(async name => {
     const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
     url.searchParams.set('name', name);
