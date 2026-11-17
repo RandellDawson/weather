@@ -65,6 +65,39 @@ async function getWeatherApi(latitude, longitude, key, forceRefresh) {
     location: current.status === 'fulfilled' ? current.value.location : forecast.status === 'fulfilled' ? forecast.value.location : null
   };
 }
+
+// Use Census incorporated-place boundaries rather than WeatherAPI's nearest named point.
+// Cache results to avoid repeated reverse-geocoding requests on refresh.
+const placeCache = new Map();
+const PLACE_TTL = 24 * 60 * 60 * 1000;
+async function getCensusPlace(latitude, longitude, key) {
+  const cached = placeCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.location;
+  const url = new URL('https://geocoding.geo.census.gov/geocoder/geographies/coordinates');
+  url.searchParams.set('x', String(longitude));
+  url.searchParams.set('y', String(latitude));
+  url.searchParams.set('benchmark', 'Public_AR_Current');
+  url.searchParams.set('vintage', 'Current_Current');
+  url.searchParams.set('format', 'json');
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!response.ok) throw new Error('Census HTTP ' + response.status);
+    const data = await response.json();
+    const geographies = data?.result?.geographies || {};
+    const places = geographies['Incorporated Places'] || [];
+    const place = places.find(p => p.NAME && p.STATE);
+    const location = place ? {
+      city: place.NAME.replace(/ (city|town|village|borough)$/i, ''),
+      region: null
+    } : null;
+    if (placeCache.size >= 200) placeCache.delete(placeCache.keys().next().value);
+    placeCache.set(key, { location, expires: Date.now() + PLACE_TTL });
+    return location;
+  } catch (error) {
+    console.warn('Census city lookup unavailable:', error.message);
+    return null;
+  }
+}
 function validNwsHourly(periods) {
   if (!Array.isArray(periods)) return false;
   const future = periods.filter(p => Date.parse(p.endTime) > Date.now());
@@ -118,13 +151,14 @@ async function getDashboard(req, res) {
     const weatherapi = weatherApiResult.status === 'fulfilled' ? weatherApiResult.value : null;
     const currentSource = usableObservation(nws?.selected?.observation) ? 'NWS' : Number.isFinite(weatherapi?.current?.temp_f) ? 'WeatherAPI.com' : 'Open-Meteo';
     const hourlySource = validNwsHourly(nws?.hourly) ? 'NWS' : validWeatherApiHourly(weatherapi) ? 'WeatherAPI.com' : 'Open-Meteo';
+    const censusPlace = await getCensusPlace(latitude, longitude, key);
     const data = {
       coordinates: { latitude, longitude },
       forecast: { ...dailyResult.value, hourly: hourlyResult.value.hourly, current: currentResult.value.current },
       nws: nws?.selected || null,
       nwsHourly: hourlySource === 'NWS' ? nws.hourly : null,
       weatherapi: weatherapi?.current || null,
-      location: weatherapi?.location ? { city: weatherapi.location.name, region: weatherapi.location.region } : null,
+      location: censusPlace ? { city: censusPlace.city, region: weatherapi?.location?.region || null } : weatherapi?.location ? { city: weatherapi.location.name, region: weatherapi.location.region } : null,
       weatherapiHourly: hourlySource === 'WeatherAPI.com' ? weatherapi.forecast.forecastday.flatMap(d => d.hour || []) : null,
       weatherapiDaily: Array.isArray(weatherapi?.forecast?.forecastday) ? weatherapi.forecast.forecastday : [],
       sources: { forecast: 'Open-Meteo', hourly: hourlySource, station: 'NWS', current: currentSource },
