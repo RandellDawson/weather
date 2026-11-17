@@ -106,23 +106,23 @@ function render(data) {
   const m=$('metrics');m.replaceChildren();
   const obsMetric=(field, convert, unit, fallback) => useNws ? (nwsValue(obs[field]?.value,convert,unit) ?? fallback) : fallback;
   [
-    ['Feels like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],
+    ['Feels Like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],
     ['Humidity',obsMetric('relativeHumidity',x=>x,'%',val(w?.humidity ?? c.relative_humidity_2m,'%'))],
     ['Wind',obsMetric('windSpeed',x=>x*2.236936,' mph',val(w?.wind_mph ?? c.wind_speed_10m,' mph'))],
     ['Gust',obsMetric('windGust',x=>x*2.236936,' mph',val(w?.gust_mph ?? c.wind_gusts_10m,' mph'))],
-    ['Dew point',obsMetric('dewpoint',x=>x*9/5+32,'°F',val(w?.dewpoint_f,'°F'))],
+    ['Dew Point',obsMetric('dewpoint',x=>x*9/5+32,'°F',val(w?.dewpoint_f,'°F'))],
     ['Pressure',obsMetric('barometricPressure',x=>x/3386.389,' inHg',val(w?.pressure_in ?? (Number.isFinite(c.surface_pressure) ? Math.round(c.surface_pressure * 0.0295299830714 * 100) / 100 : null),' inHg'))],
-    ['Cloud cover',val(c.cloud_cover,'%')]
+    ['Cloud Cover',val(c.cloud_cover,'%')]
   ].forEach(([a,b])=>m.append(metric(a,b)));
   const h=$('hourly');h.replaceChildren();
   const hourlySource=data.sources.hourly;
   const title=document.querySelector('.panel h2');
-  if (title) title.textContent='Next 24 hours · '+hourlySource;
+  if (title) title.textContent='Next 24 Hours · '+hourlySource;
   function compass(degrees) {
     return Number.isFinite(degrees) ? ['N','NE','E','SE','S','SW','W','NW'][Math.round(((degrees % 360) + 360) % 360 / 45) % 8] : null;
   }
   function addHour(time, temp, description, chance, symbol, isDay, windSpeed, windDirection, windGust) {
-    card(h,'hour',[['small',time],['strong',val(Math.round(temp),'°')],['small',description],['small',val(chance,'% rain')]]);
+    card(h,'hour',[['small',time],['strong',val(Math.round(temp),'°')],['small',description],['small',val(chance,'% Rain')]]);
     const hour=h.lastElementChild;
     hour.children[2].classList.add('hour-description');
     hour.children[3].classList.add('hour-precipitation');
@@ -189,16 +189,16 @@ function render(data) {
     bottom.className='day-details';
     const precipitation=document.createElement('span');
     precipitation.className='day-precipitation';
-    precipitation.textContent='💧 '+val(f.daily.precipitation_probability_max[i],'% rain');
+    precipitation.textContent='💧 '+val(f.daily.precipitation_probability_max[i],'% Rain');
     const wind=document.createElement('span');
     wind.className='day-wind';
     const maxWind=f.daily.wind_speed_10m_max?.[i];
     const direction=dailyWindDirection(f.daily.wind_direction_10m_dominant?.[i]);
-    wind.textContent='Wind max: '+direction+' '+(Number.isFinite(maxWind)?Math.round(maxWind)+' mph':'—');
+    wind.textContent='Max Wind: '+direction+' '+(Number.isFinite(maxWind)?Math.round(maxWind)+' mph':'—');
     const gust=document.createElement('span');
     gust.className='day-gust';
     const maxGust=f.daily.wind_gusts_10m_max?.[i];
-    gust.textContent='Gusts max: '+(Number.isFinite(maxGust)?Math.round(maxGust)+' mph':'—');
+    gust.textContent='Max Gusts: '+(Number.isFinite(maxGust)?Math.round(maxGust)+' mph':'—');
     bottom.append(precipitation,wind,gust);
     row.append(top,bottom);
     d.append(row);
