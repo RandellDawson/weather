@@ -110,7 +110,10 @@ test('rejects invalid query, handles short ZIPs, and blocks cross-site search', 
   mockGeocoder();
   await withServer(async base => {
     assert.equal((await search(base, 'abc@def')).status, 400);
-    // Four-digit numeric queries are rejected by server validation.\n    const incompleteZip = await search(base, '4200');\n    assert.equal(incompleteZip.status, 400);\n    assert.match(incompleteZip.body.error, /valid U\\.S\\. city|ZIP code/);
+    // Four-digit numeric queries are rejected by server validation.
+    const incompleteZip = await search(base, '4200');
+    assert.equal(incompleteZip.status, 400);
+    assert.match(incompleteZip.body.error, /valid U\.S\. city|ZIP code/);
     const crossSite = await originalFetch(base + '/api/locations/search?q=paducah', {headers:{Origin:'https://evil.example'}});
     assert.equal(crossSite.status, 403);
   });
