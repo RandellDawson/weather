@@ -284,7 +284,7 @@ function renderRecents() {
   for (const place of places) {
     const chip = document.createElement('div'); chip.className = 'recent-chip';
     const open = document.createElement('button'); open.type = 'button'; open.textContent = recentLabel(place);
-    open.addEventListener('click', () => chooseLocation(place));
+    open.addEventListener('click', () => chooseLocation(place, true));
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'recent-remove';
     remove.textContent = '×'; remove.setAttribute('aria-label', 'Remove ' + recentLabel(place));
     remove.addEventListener('click', () => saveRecents(recentLocations().filter(p => p.id !== place.id)));
@@ -323,14 +323,14 @@ async function findLocations(q) {
   if (!response.ok) throw new Error(data.error || 'Location lookup failed');
   return data.results || [];
 }
-async function chooseLocation(place) {
+async function chooseLocation(place, forceRefresh = false) {
   // Invalidate any pending autocomplete request before it can overwrite selection.
   clearTimeout(searchTimer);
   searchSequence++;
   selectedSuggestion = place;
   $('location-message').textContent = '';
   clearSuggestions();
-  const success = await load(place.lat, place.lon, place);
+  const success = await load(place.lat, place.lon, place, forceRefresh);
   if (success) { rememberLocation(place); $('location-query').value = locationLabel(place); }
   else $('location-message').textContent = 'Weather could not be loaded for ' + locationLabel(place) + '.';
 }
@@ -395,11 +395,11 @@ let lastSuccessfulRefresh = 0;
 let loading = false;
 // A browser navigation reload triggers one uncached provider fetch.
 let reloadPending = performance.getEntriesByType('navigation').some(entry => entry.type === 'reload');
-async function load(lat,lon,selectedPlace = null) {
+async function load(lat,lon,selectedPlace = null, requestedRefresh = false) {
   if (loading) return false;
   loading = true;
   $('status').textContent='Loading weather…';
-  const forceRefresh = reloadPending;
+  const forceRefresh = reloadPending || requestedRefresh;
   reloadPending = false;
   try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data,selectedPlace);lastCoordinates={lat,lon};lastSelectedPlace=selectedPlace;lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();return true;}
   catch(e){$('status').textContent='Unable to load weather: '+e.message;return false;}
