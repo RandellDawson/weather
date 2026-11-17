@@ -13,13 +13,20 @@ async function withServer(fn) {
   }
 }
 
-test('serves original-looking website and health check', async () => withServer(async base => {
+test('serves redesigned weather dashboard and health check', async () => withServer(async base => {
   const home = await fetch(base);
   assert.equal(home.status, 200);
-  assert.match(await home.text(), /id="weather-info"/);
+  const html = await home.text();
+  for (const id of ['locate', 'status', 'temperature', 'hourly', 'daily', 'metrics']) {
+    assert.match(html, new RegExp('id="' + id + '"'));
+  }
+  assert.doesNotMatch(html, /id="weather-info"|<h1>Weather dashboard<\/h1>/);
   const css = await fetch(base + '/style.css');
   assert.equal(css.status, 200);
-  assert.match(await css.text(), /#weather-info/);
+  const stylesheet = await css.text();
+  assert.match(stylesheet, /\.current-toolbar/);
+  assert.match(stylesheet, /\.days/);
+  assert.match(stylesheet, /data-theme="day"/);
   const health = await fetch(base + '/health');
   assert.deepEqual(await health.json(), { status: 'ok' });
 }));
