@@ -61,7 +61,8 @@ async function getWeatherApi(latitude, longitude, key, forceRefresh) {
   if (current.status === 'rejected') console.warn('WeatherAPI current unavailable:', current.reason.message);
   return {
     ...(forecast.status === 'fulfilled' ? forecast.value : {}),
-    current: current.status === 'fulfilled' ? current.value.current : null
+    current: current.status === 'fulfilled' ? current.value.current : null,
+    location: current.status === 'fulfilled' ? current.value.location : forecast.status === 'fulfilled' ? forecast.value.location : null
   };
 }
 function validNwsHourly(periods) {
@@ -123,6 +124,7 @@ async function getDashboard(req, res) {
       nws: nws?.selected || null,
       nwsHourly: hourlySource === 'NWS' ? nws.hourly : null,
       weatherapi: weatherapi?.current || null,
+      location: weatherapi?.location ? { city: weatherapi.location.name, region: weatherapi.location.region } : null,
       weatherapiHourly: hourlySource === 'WeatherAPI.com' ? weatherapi.forecast.forecastday.flatMap(d => d.hour || []) : null,
       weatherapiDaily: Array.isArray(weatherapi?.forecast?.forecastday) ? weatherapi.forecast.forecastday : [],
       sources: { forecast: 'Open-Meteo', hourly: hourlySource, station: 'NWS', current: currentSource },

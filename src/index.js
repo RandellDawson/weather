@@ -69,6 +69,9 @@ function setSolarSchedule(forecast) {
 
 function render(data) {
   setSolarSchedule(data.forecast);
+  const city=data.location?.city?.trim();
+  const region=data.location?.region?.trim();
+  $('current-city').textContent=city ? city + (region ? ', ' + region : '') : 'Current Location';
   const f=data.forecast, c=f.current, w=data.weatherapi;
   const station=data.nws;
   const obs=station?.observation;
@@ -114,10 +117,10 @@ function render(data) {
     dailySourceLabel.append(data.sources.forecast);
   }
   source.append(hourlySourceLabel,dailySourceLabel);
+  $('feels-like').textContent='Feels Like '+val(w?.feelslike_f ?? c.apparent_temperature,'°F');
   const m=$('metrics');m.replaceChildren();
   const obsMetric=(field, convert, unit, fallback) => useNws ? (nwsValue(obs[field]?.value,convert,unit) ?? fallback) : fallback;
   [
-    ['Feels Like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],
     ['Humidity',obsMetric('relativeHumidity',x=>x,'%',val(w?.humidity ?? c.relative_humidity_2m,'%'))],
     ['Wind',obsMetric('windSpeed',x=>x*2.236936,' mph',val(w?.wind_mph ?? c.wind_speed_10m,' mph'))],
     ['Gust',obsMetric('windGust',x=>x*2.236936,' mph',val(w?.gust_mph ?? c.wind_gusts_10m,' mph'))],

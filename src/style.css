@@ -77,3 +77,7 @@
 #source{display:block;margin:20px 0 0;line-height:1.6}
 #source a{color:#91cdff;text-decoration:underline;text-underline-offset:2px}
 :root[data-theme="day"] #source a{color:#1468ae}
+
+/* Resolved city above the current reading. */
+.current-city{font-size:1.1rem;font-weight:650;margin:10px 0 4px;color:inherit}
+:root[data-theme="day"] .current-city{color:#172c42}
