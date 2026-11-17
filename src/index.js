@@ -26,20 +26,26 @@ async function load(lat,lon) {
   catch(e){$('status').textContent='Unable to load weather: '+e.message;}
 }
 function locate() {
+  const button = $('locate');
+  button.disabled = true;
+  button.textContent = 'Updating…';
+  const finish = () => { button.disabled = false; button.textContent = '↻ Refresh location'; };
   if (!navigator.geolocation) {
     $('status').textContent='Your browser does not support geolocation.';
+    finish();
     return;
   }
   $('status').textContent='Requesting your location…';
   navigator.geolocation.getCurrentPosition(
-    position => load(position.coords.latitude, position.coords.longitude),
+    async position => { try { await load(position.coords.latitude, position.coords.longitude); } finally { finish(); } },
     error => {
       const message = error.code === 1 ? 'Location permission denied. Enable location access in your browser settings and retry.'
         : error.code === 2 ? 'Your location could not be determined. Please retry.'
         : 'Location request timed out. Please retry.';
       $('status').textContent=message;
+      finish();
     },
-    {enableHighAccuracy:true,timeout:12000,maximumAge:60000}
+    {enableHighAccuracy:true,timeout:12000,maximumAge:0}
   );
 }
 $('locate').addEventListener('click',locate);
