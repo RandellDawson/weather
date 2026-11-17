@@ -67,10 +67,10 @@ function setSolarSchedule(forecast) {
   updateTheme();
 }
 
-function render(data) {
+function render(data, selectedPlace = null) {
   setSolarSchedule(data.forecast);
-  const city=data.location?.city?.trim();
-  const region=data.location?.region?.trim();
+  const city=(selectedPlace?.name || data.location?.city)?.trim();
+  const region=(selectedPlace?.region || data.location?.region)?.trim();
   $('current-city').textContent=city ? city + (region ? ', ' + region : '') : 'Current Location';
   const f=data.forecast, c=f.current, w=data.weatherapi;
   const station=data.nws;
@@ -234,20 +234,175 @@ function render(data) {
     d.append(row);
   });
 }
+
+const RECENT_KEY = 'weather-recent-locations-v1';
+let suggestions = [], selectedSuggestion = null, activeSuggestion = -1, searchTimer = null, searchSequence = 0;
+function locationLabel(place) { return place.name + (place.region ? ', ' + place.region : ''); }
+function suggestionLabel(place) { return place.zip ? place.zip + ' — ' + locationLabel(place) : locationLabel(place); }
+function recentLabel(place) { return locationLabel(place) + (place.zip ? ' (' + place.zip + ')' : ''); }
+const US_STATES = {
+  AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',
+  DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',
+  IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',
+  MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',
+  NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',
+  NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',
+  RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',
+  VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'
+};
+function normalizedPlaceKey(place) {
+  const normalize = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const state = String(place.region || '').trim();
+  const fullState = US_STATES[state.toUpperCase()] || state;
+  return normalize(place.name) + ':' + normalize(fullState);
+}
+function samePlace(a, b) {
+  // A ZIP search is distinct from a city search, even if both resolve to the same city.
+  // ZIPs must match by their exact five-digit code, not by city name or coordinates.
+  if (a.zip || b.zip) return Boolean(a.zip && b.zip && a.zip === b.zip);
+  return a.id === b.id || normalizedPlaceKey(a) === normalizedPlaceKey(b);
+}
+function recentLocations() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    if (!Array.isArray(saved)) return [];
+    const unique = [];
+    for (const place of saved) {
+      if (!place || typeof place.id !== 'string' || !Number.isFinite(place.lat) || !Number.isFinite(place.lon)) continue;
+      if (!unique.some(existing => samePlace(existing, place))) unique.push(place);
+      if (unique.length === 5) break;
+    }
+    return unique;
+  } catch { return []; }
+}
+function saveRecents(items) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0,5))); } catch {} renderRecents(); }
+function renderRecents() {
+  const host = $('recent-locations'); host.replaceChildren();
+  const places = recentLocations();
+  if (!places.length) return;
+  const title = document.createElement('span'); title.className = 'recent-title'; title.textContent = 'Recent Locations'; host.append(title);
+  for (const place of places) {
+    const chip = document.createElement('div'); chip.className = 'recent-chip';
+    const open = document.createElement('button'); open.type = 'button'; open.textContent = recentLabel(place);
+    open.addEventListener('click', () => chooseLocation(place, true));
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'recent-remove';
+    remove.textContent = '×'; remove.setAttribute('aria-label', 'Remove ' + recentLabel(place));
+    remove.addEventListener('click', () => saveRecents(recentLocations().filter(p => p.id !== place.id)));
+    chip.append(open, remove); host.append(chip);
+  }
+}
+function rememberLocation(place) {
+  // City and ZIP searches can resolve to different coordinates or state formats.
+  saveRecents([place, ...recentLocations().filter(p => !samePlace(p, place))]);
+}
+function clearSuggestions() {
+  suggestions = []; activeSuggestion = -1;
+  $('location-suggestions').replaceChildren(); $('location-suggestions').hidden = true;
+  $('location-suggestions').scrollTop = 0;
+  $('location-query').setAttribute('aria-expanded','false');
+}
+function showSuggestions(items) {
+  suggestions = items; activeSuggestion = -1;
+  const list = $('location-suggestions'); list.replaceChildren();
+  items.forEach((place, index) => {
+    const item = document.createElement('button'); item.type = 'button'; item.className = 'location-option';
+    item.setAttribute('role','option'); item.id = 'location-option-' + index;
+    item.textContent = suggestionLabel(place);
+    item.addEventListener('click', () => { selectedSuggestion = place; $('location-query').value = locationLabel(place); clearSuggestions(); chooseLocation(place); });
+    list.append(item);
+  });
+  list.hidden = !items.length;
+  // Reset only after the list is visible and populated; browsers can restore
+  // the previous scroll offset when a previously hidden element is shown.
+  list.scrollTop = 0;
+  $('location-query').setAttribute('aria-expanded', String(!!items.length));
+}
+async function findLocations(q) {
+  const response = await fetch('/api/locations/search?' + new URLSearchParams({q}), {cache:'no-store'});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Location lookup failed');
+  return data.results || [];
+}
+async function chooseLocation(place, forceRefresh = false) {
+  // Invalidate any pending autocomplete request before it can overwrite selection.
+  clearTimeout(searchTimer);
+  searchSequence++;
+  selectedSuggestion = place;
+  $('location-message').textContent = '';
+  clearSuggestions();
+  const success = await load(place.lat, place.lon, place, forceRefresh);
+  if (success) { rememberLocation(place); $('location-query').value = locationLabel(place); }
+  else $('location-message').textContent = 'Weather could not be loaded for ' + locationLabel(place) + '.';
+}
+const queryInput = $('location-query');
+queryInput.addEventListener('input', () => {
+  selectedSuggestion = null;
+  clearTimeout(searchTimer); searchSequence++;
+  const q = queryInput.value.trim();
+  clearSuggestions(); $('location-message').textContent = '';
+  if (q.length < 3 || (/^\d+$/.test(q) && q.length !== 5)) return;
+  const seq = searchSequence;
+  searchTimer = setTimeout(async () => {
+    try {
+      const results = await findLocations(q);
+      if (seq !== searchSequence) return;
+      showSuggestions(results);
+      if (!results.length) $('location-message').textContent = /^\d{5}$/.test(q) ? 'ZIP code not found.' : 'No matching U.S. cities found.';
+    } catch (error) { if (seq === searchSequence) $('location-message').textContent = error.message; }
+  }, 300);
+});
+// Dismiss suggestions when interacting outside the search controls.
+// Keep clicks on suggestion buttons working by treating the whole form as inside.
+document.addEventListener('pointerdown', event => {
+  if (!$('location-form').contains(event.target)) clearSuggestions();
+});
+queryInput.addEventListener('keydown', event => {
+  if (!suggestions.length) return;
+  if (event.key === 'Escape') { clearSuggestions(); return; }
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault(); activeSuggestion = (activeSuggestion + (event.key === 'ArrowDown' ? 1 : suggestions.length - 1)) % suggestions.length;
+    [...$('location-suggestions').children].forEach((node,i) => node.setAttribute('aria-selected',String(i === activeSuggestion)));
+    queryInput.setAttribute('aria-activedescendant','location-option-' + activeSuggestion);
+  } else if (event.key === 'Enter' && activeSuggestion >= 0) {
+    event.preventDefault(); const place = suggestions[activeSuggestion];
+    selectedSuggestion = place; queryInput.value = locationLabel(place); chooseLocation(place);
+  }
+});
+$('location-form').addEventListener('submit', async event => {
+  event.preventDefault(); clearTimeout(searchTimer); searchSequence++;
+  const q = queryInput.value.trim();
+  if (!q) { $('location-message').textContent = 'Enter a U.S. city or five-digit ZIP code.'; return; }
+  // A displayed city/state is a valid selected location, not a new geocoding query.
+  // Resolve it even if focus changes or autocomplete selection state was cleared.
+  const savedPlace = [selectedSuggestion, lastSelectedPlace, ...recentLocations()]
+    .find(place => place && q === locationLabel(place));
+  if (savedPlace) { await chooseLocation(savedPlace); return; }
+  if (/^\d+$/.test(q) && !/^\d{5}$/.test(q)) { $('location-message').textContent = 'Enter a five-digit U.S. ZIP code.'; return; }
+  if (q.length < 3) { $('location-message').textContent = 'Enter at least three letters of a city name.'; return; }
+  try {
+    const results = await findLocations(q);
+    if (!results.length) { $('location-message').textContent = 'No matching U.S. city or ZIP code found.'; return; }
+    showSuggestions(results);
+    $('location-message').textContent = /^\d{5}$/.test(q) ? 'Select the matching ZIP code location.' : 'Select a city from the suggestions.';
+  } catch (error) { $('location-message').textContent = error.message; }
+});
+renderRecents();
+
 const REFRESH_MS = 15 * 60 * 1000;
 let lastCoordinates = null;
+let lastSelectedPlace = null;
 let lastSuccessfulRefresh = 0;
 let loading = false;
 // A browser navigation reload triggers one uncached provider fetch.
 let reloadPending = performance.getEntriesByType('navigation').some(entry => entry.type === 'reload');
-async function load(lat,lon) {
-  if (loading) return;
+async function load(lat,lon,selectedPlace = null, requestedRefresh = false) {
+  if (loading) return false;
   loading = true;
   $('status').textContent='Loading weather…';
-  const forceRefresh = reloadPending;
+  const forceRefresh = reloadPending || requestedRefresh;
   reloadPending = false;
-  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);lastCoordinates={lat,lon};lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();}
-  catch(e){$('status').textContent='Unable to load weather: '+e.message;}
+  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data,selectedPlace);lastCoordinates={lat,lon};lastSelectedPlace=selectedPlace;lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();return true;}
+  catch(e){$('status').textContent='Unable to load weather: '+e.message;return false;}
   finally{loading=false;}
 }
 function locate() {
@@ -279,7 +434,7 @@ locate();
 // Background tabs may throttle timers; catch up when the page becomes visible.
 function refreshIfDue() {
   if (!document.hidden && lastCoordinates && !loading && Date.now() - lastSuccessfulRefresh >= REFRESH_MS) {
-    load(lastCoordinates.lat,lastCoordinates.lon);
+    load(lastCoordinates.lat,lastCoordinates.lon,lastSelectedPlace);
   }
 }
 setInterval(refreshIfDue, 60 * 1000);

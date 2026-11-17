@@ -3,7 +3,11 @@ const { rateLimit } = require('express-rate-limit');
 const ALLOWED_ORIGINS = new Set([
   'https://weather.randelldawson.com',
   'http://localhost:3000',
-  'http://127.0.0.1:3000'
+  'http://127.0.0.1:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+  'http://localhost:3002',
+  'http://127.0.0.1:3002'
 ]);
 
 function restrictOrigin(req, res, next) {
@@ -40,4 +44,12 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests. Please try again later.' }
 });
 
-module.exports = { restrictOrigin, apiLimiter };
+const searchLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 240,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Too many location searches. Please try again later.' }
+});
+
+module.exports = { restrictOrigin, apiLimiter, searchLimiter };
