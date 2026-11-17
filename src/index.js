@@ -117,6 +117,8 @@ function render(data) {
   function addHour(time, temp, description, chance, symbol, isDay, windSpeed, windDirection, windGust) {
     card(h,'hour',[['small',time],['strong',val(Math.round(temp),'°')],['small',description],['small',val(chance,'% rain')]]);
     const hour=h.lastElementChild;
+    hour.children[2].classList.add('hour-description');
+    hour.children[3].classList.add('hour-precipitation');
     const icon=iconNode(0,isDay);
     icon.textContent=symbol;
     icon.setAttribute('aria-label',description);
