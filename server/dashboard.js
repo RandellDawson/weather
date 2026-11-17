@@ -1,7 +1,7 @@
 const { validateCoords } = require('./weather');
 const cache = new Map();
 const TTL = 10 * 60 * 1000;
-const HOURLY_TTL = 15 * 60 * 1000;
+const HOURLY_TTL = 30 * 60 * 1000;
 const DAILY_TTL = 60 * 60 * 1000;
 const hourlyCache = new Map();
 const dailyCache = new Map();
