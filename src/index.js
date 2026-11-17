@@ -1,6 +1,27 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const codeText = c => ({0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Cloudy',45:'Fog',48:'Fog',51:'Drizzle',53:'Drizzle',55:'Drizzle',61:'Rain',63:'Rain',65:'Heavy rain',71:'Snow',73:'Snow',75:'Heavy snow',80:'Showers',81:'Showers',82:'Heavy showers',95:'Thunderstorms'})[c] || 'Variable conditions';
+// Local, dependency-free weather icons. Supports Open-Meteo WMO codes and day/night.
+function weatherIcon(code, isDay = true) {
+  if (code === 0) return isDay ? '☀️' : '🌙';
+  if (code === 1) return isDay ? '🌤️' : '🌙';
+  if (code === 2) return isDay ? '⛅' : '☁️';
+  if (code === 3) return '☁️';
+  if (code === 45 || code === 48) return '🌫️';
+  if ([51,53,55,56,57].includes(code)) return '🌦️';
+  if ([61,63,65,66,67,80,81,82].includes(code)) return '🌧️';
+  if ([71,73,75,77,85,86].includes(code)) return '🌨️';
+  if ([95,96,99].includes(code)) return '⛈️';
+  return '🌥️';
+}
+function iconNode(code, isDay = true) {
+  const node = document.createElement('span');
+  node.className = 'weather-icon';
+  node.setAttribute('role','img');
+  node.setAttribute('aria-label', codeText(code));
+  node.textContent = weatherIcon(code, isDay);
+  return node;
+}
 const val = (x, unit = '') => x == null ? '—' : x + unit;
 function metric(label, value) { const box=document.createElement('div');box.className='metric';const small=document.createElement('small');small.textContent=label;const strong=document.createElement('strong');strong.textContent=value;box.append(small,strong);return box; }
 function card(parent, className, values) { const box=document.createElement('div');box.className=className;for(const [tag,text] of values){const node=document.createElement(tag);node.textContent=text;box.append(node);}parent.append(box); }
@@ -8,15 +29,16 @@ function render(data) {
   const f=data.forecast, c=f.current, w=data.weatherapi;
   $('location').textContent=data.coordinates.latitude.toFixed(5)+', '+data.coordinates.longitude.toFixed(5)+' · '+f.timezone;
   $('temperature').textContent=val(w?.temp_f ?? c.temperature_2m,'°F');
+  $('current-icon').replaceChildren(iconNode(c.weather_code, c.is_day !== 0));
   $('conditions').textContent=w?.condition?.text || codeText(c.weather_code);
   $('source').textContent=(w?'WeatherAPI.com estimated current conditions':'Open-Meteo modeled current conditions')+' · '+(w?.last_updated || c.time);
   const m=$('metrics');m.replaceChildren();
   [['Feels like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],['Humidity',val(w?.humidity ?? c.relative_humidity_2m,'%')],['Wind',val(w?.wind_mph ?? c.wind_speed_10m,' mph')],['Gust',val(w?.gust_mph,' mph')],['Dew point',val(w?.dewpoint_f,'°F')],['Pressure',val(w?.pressure_in,' inHg')],['Cloud cover',val(w?.cloud ?? c.cloud_cover,'%')],['UV index',val(w?.uv)]].forEach(([a,b])=>m.append(metric(a,b)));
   const h=$('hourly');h.replaceChildren();
   const times=f.hourly.time;let start=times.findIndex(t=>t>=c.time.slice(0,13)+':00');if(start<0)start=0;
-  for(let i=start;i<Math.min(start+24,times.length);i++){const date=new Date(times[i]+'Z');card(h,'hour',[['small',new Intl.DateTimeFormat('en-US',{hour:'numeric',timeZone:'UTC'}).format(date)],['strong',val(Math.round(f.hourly.temperature_2m[i]),'°')],['small',codeText(f.hourly.weather_code[i])],['small',val(f.hourly.precipitation_probability[i],'% rain')]]);}
+  for(let i=start;i<Math.min(start+24,times.length);i++){const date=new Date(times[i]+'Z');card(h,'hour',[['small',new Intl.DateTimeFormat('en-US',{hour:'numeric',timeZone:'UTC'}).format(date)],['strong',val(Math.round(f.hourly.temperature_2m[i]),'°')],['small',codeText(f.hourly.weather_code[i])],['small',val(f.hourly.precipitation_probability[i],'% rain')]]);const hour=h.lastElementChild;hour.insertBefore(iconNode(f.hourly.weather_code[i],f.hourly.is_day?.[i] !== 0),hour.children[1]);}
   const d=$('daily');d.replaceChildren();
-  f.daily.time.forEach((date,i)=>card(d,'day',[['small',date],['strong',Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°'],['span',codeText(f.daily.weather_code[i])],['p',val(f.daily.precipitation_probability_max[i],'% rain')]]));
+  f.daily.time.forEach((date,i)=>{card(d,'day',[['small',date],['strong',Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°'],['span',codeText(f.daily.weather_code[i])],['p',val(f.daily.precipitation_probability_max[i],'% rain')]]);const day=d.lastElementChild;day.insertBefore(iconNode(f.daily.weather_code[i]),day.children[1]);});
   const station=data.nws;
   $('station').textContent=station?.observation ? station.station.name+': '+(station.observation.temperature?.value==null?'Temperature unavailable':(station.observation.temperature.value*9/5+32).toFixed(1)+'°F')+' · observed '+(station.observation.timestamp||'unknown time') : 'No current NWS station observation available for these coordinates.';
 }
