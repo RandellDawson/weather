@@ -67,10 +67,10 @@ function setSolarSchedule(forecast) {
   updateTheme();
 }
 
-function render(data) {
+function render(data, selectedPlace = null) {
   setSolarSchedule(data.forecast);
-  const city=data.location?.city?.trim();
-  const region=data.location?.region?.trim();
+  const city=(selectedPlace?.name || data.location?.city)?.trim();
+  const region=(selectedPlace?.region || data.location?.region)?.trim();
   $('current-city').textContent=city ? city + (region ? ', ' + region : '') : 'Current Location';
   const f=data.forecast, c=f.current, w=data.weatherapi;
   const station=data.nws;
@@ -321,7 +321,7 @@ async function findLocations(q) {
 async function chooseLocation(place) {
   $('location-message').textContent = '';
   clearSuggestions();
-  const success = await load(place.lat, place.lon);
+  const success = await load(place.lat, place.lon, place);
   if (success) { rememberLocation(place); $('location-query').value = locationLabel(place); }
   else $('location-message').textContent = 'Weather could not be loaded for ' + locationLabel(place) + '.';
 }
@@ -372,17 +372,18 @@ renderRecents();
 
 const REFRESH_MS = 15 * 60 * 1000;
 let lastCoordinates = null;
+let lastSelectedPlace = null;
 let lastSuccessfulRefresh = 0;
 let loading = false;
 // A browser navigation reload triggers one uncached provider fetch.
 let reloadPending = performance.getEntriesByType('navigation').some(entry => entry.type === 'reload');
-async function load(lat,lon) {
+async function load(lat,lon,selectedPlace = null) {
   if (loading) return false;
   loading = true;
   $('status').textContent='Loading weather…';
   const forceRefresh = reloadPending;
   reloadPending = false;
-  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data);lastCoordinates={lat,lon};lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();return true;}
+  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data,selectedPlace);lastCoordinates={lat,lon};lastSelectedPlace=selectedPlace;lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();return true;}
   catch(e){$('status').textContent='Unable to load weather: '+e.message;return false;}
   finally{loading=false;}
 }
@@ -415,7 +416,7 @@ locate();
 // Background tabs may throttle timers; catch up when the page becomes visible.
 function refreshIfDue() {
   if (!document.hidden && lastCoordinates && !loading && Date.now() - lastSuccessfulRefresh >= REFRESH_MS) {
-    load(lastCoordinates.lat,lastCoordinates.lon);
+    load(lastCoordinates.lat,lastCoordinates.lon,lastSelectedPlace);
   }
 }
 setInterval(refreshIfDue, 60 * 1000);
