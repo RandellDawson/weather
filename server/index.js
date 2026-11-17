@@ -4,7 +4,7 @@ const path = require('node:path');
 const { getWeather } = require('./weather');
 const { getDashboard } = require('./dashboard');
 const { searchLocations } = require('./locationSearch');
-const { restrictOrigin, apiLimiter } = require('./apiProtection');
+const { restrictOrigin, apiLimiter, searchLimiter } = require('./apiProtection');
 
 const app = express();
 app.disable('x-powered-by');
@@ -14,9 +14,11 @@ if (trustProxy !== 0 && trustProxy !== 1) {
 }
 if (trustProxy === 1) app.set('trust proxy', 'loopback');
 
-app.use(['/current', '/api/dashboard', '/api/locations/search'], restrictOrigin, apiLimiter);
+app.use(['/current', '/api/dashboard', '/api/locations/search'], restrictOrigin);
+// Autocomplete is high-frequency; keep its quota separate from weather requests.
+app.use(['/current', '/api/dashboard'], apiLimiter);
 app.get('/api/dashboard', getDashboard);
-app.get('/api/locations/search', searchLocations);
+app.get('/api/locations/search', searchLimiter, searchLocations);
 
 app.get('/current', getWeather);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
