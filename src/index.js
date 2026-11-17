@@ -92,9 +92,9 @@ function render(data) {
     ['Feels like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],
     ['Humidity',obsMetric('relativeHumidity',x=>x,'%',val(w?.humidity ?? c.relative_humidity_2m,'%'))],
     ['Wind',obsMetric('windSpeed',x=>x*2.236936,' mph',val(w?.wind_mph ?? c.wind_speed_10m,' mph'))],
-    ['Gust',obsMetric('windGust',x=>x*2.236936,' mph',val(w?.gust_mph,' mph'))],
+    ['Gust',obsMetric('windGust',x=>x*2.236936,' mph',val(w?.gust_mph ?? c.wind_gusts_10m,' mph'))],
     ['Dew point',obsMetric('dewpoint',x=>x*9/5+32,'°F',val(w?.dewpoint_f,'°F'))],
-    ['Pressure',obsMetric('barometricPressure',x=>x/3386.389,' inHg',val(w?.pressure_in,' inHg'))],
+    ['Pressure',obsMetric('barometricPressure',x=>x/3386.389,' inHg',val(w?.pressure_in ?? (Number.isFinite(c.surface_pressure) ? Math.round(c.surface_pressure * 0.0295299830714 * 100) / 100 : null),' inHg'))],
     ['Cloud cover',val(c.cloud_cover,'%')]
   ].forEach(([a,b])=>m.append(metric(a,b)));
   const h=$('hourly');h.replaceChildren();
