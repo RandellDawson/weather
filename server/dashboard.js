@@ -49,7 +49,13 @@ async function getWeatherApi(latitude, longitude, key, forceRefresh) {
   url.searchParams.set('days', '2');
   url.searchParams.set('aqi', 'no');
   url.searchParams.set('alerts', 'no');
-  return cachedForecast(hourlyCache, 'weatherapi:' + key, url, HOURLY_TTL, forceRefresh);
+  const forecast = await cachedForecast(hourlyCache, 'weatherapi:' + key, url, HOURLY_TTL, forceRefresh);
+  // Current observations must not inherit the 30-minute hourly forecast cache.
+  const currentUrl = new URL('https://api.weatherapi.com/v1/current.json');
+  currentUrl.searchParams.set('key', process.env.WEATHERAPI_KEY);
+  currentUrl.searchParams.set('q', latitude + ',' + longitude);
+  try { return { ...forecast, current: (await json(currentUrl)).current }; }
+  catch { return { ...forecast, current: null }; }
 }
 function validNwsHourly(periods) {
   if (!Array.isArray(periods)) return false;
