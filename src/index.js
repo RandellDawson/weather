@@ -194,11 +194,11 @@ function render(data) {
     wind.className='day-wind';
     const maxWind=f.daily.wind_speed_10m_max?.[i];
     const direction=dailyWindDirection(f.daily.wind_direction_10m_dominant?.[i]);
-    wind.textContent='Wind max: '+direction+' '+(Number.isFinite(maxWind)?Math.round(maxWind)+' mph':'—');
+    wind.textContent='Max Wind: '+direction+' '+(Number.isFinite(maxWind)?Math.round(maxWind)+' mph':'—');
     const gust=document.createElement('span');
     gust.className='day-gust';
     const maxGust=f.daily.wind_gusts_10m_max?.[i];
-    gust.textContent='Gusts max: '+(Number.isFinite(maxGust)?Math.round(maxGust)+' mph':'—');
+    gust.textContent='Max Gusts: '+(Number.isFinite(maxGust)?Math.round(maxGust)+' mph':'—');
     bottom.append(precipitation,wind,gust);
     row.append(top,bottom);
     d.append(row);
