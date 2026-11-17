@@ -46,31 +46,61 @@ function render(data) {
   const obs=station?.observation;
   const observedAt=obs?.timestamp ? Date.parse(obs.timestamp) : NaN;
   // Reject missing, future, or stale observations; keep the forecast usable.
-  const useNws = Number.isFinite(observedAt) && Date.now() - observedAt >= -5 * 60 * 1000 && Date.now() - observedAt <= 90 * 60 * 1000 && typeof obs.temperature?.value === 'number';
+  const useNws = data.sources.current === 'NWS';
+  const useWeatherApi = data.sources.current === 'WeatherAPI.com';
   const isDay=c.is_day !== 0;
   const description=obs?.textDescription?.trim();
-  $('temperature').textContent=useNws ? nwsValue(obs.temperature.value, x => x * 9 / 5 + 32, '°F') : val(c.temperature_2m,'°F');
+  $('temperature').textContent=useNws ? nwsValue(obs.temperature.value, x => x * 9 / 5 + 32, '°F') : val(useWeatherApi ? w.temp_f : c.temperature_2m,'°F');
   const icon=iconNode(c.weather_code,isDay);
   if (useNws && description) {icon.textContent=nwsConditionIcon(description,isDay);icon.setAttribute('aria-label',description);}
+  if (useWeatherApi && w?.condition?.text) {icon.textContent=nwsConditionIcon(w.condition.text,isDay);icon.setAttribute('aria-label',w.condition.text);}
   $('current-icon').replaceChildren(icon);
-  $('conditions').textContent=useNws ? (description || 'Observed conditions') : codeText(c.weather_code);
+  $('conditions').textContent=useNws ? (description || 'Observed conditions') : useWeatherApi ? (w.condition?.text || codeText(c.weather_code)) : codeText(c.weather_code);
   $('source').textContent=useNws
     ? 'NWS observed at ' + station.station.name + ' · ' + new Date(observedAt).toLocaleString()
-    : 'Open-Meteo modeled current conditions · ' + c.time + (obs ? ' · NWS observation unavailable or stale' : '');
+    : useWeatherApi ? 'WeatherAPI.com current conditions · ' + (w.last_updated || 'latest') : 'Open-Meteo modeled current conditions · ' + c.time;
   const m=$('metrics');m.replaceChildren();
   const obsMetric=(field, convert, unit, fallback) => useNws ? (nwsValue(obs[field]?.value,convert,unit) ?? fallback) : fallback;
   [
-    ['Feels like',val(c.apparent_temperature,'°F')],
-    ['Humidity',obsMetric('relativeHumidity',x=>x,'%',val(c.relative_humidity_2m,'%'))],
-    ['Wind',obsMetric('windSpeed',x=>x*2.236936,' mph',val(c.wind_speed_10m,' mph'))],
-    ['Gust',obsMetric('windGust',x=>x*2.236936,' mph','—')],
-    ['Dew point',obsMetric('dewpoint',x=>x*9/5+32,'°F','—')],
-    ['Pressure',obsMetric('barometricPressure',x=>x/3386.389,' inHg','—')],
+    ['Feels like',val(w?.feelslike_f ?? c.apparent_temperature,'°F')],
+    ['Humidity',obsMetric('relativeHumidity',x=>x,'%',val(w?.humidity ?? c.relative_humidity_2m,'%'))],
+    ['Wind',obsMetric('windSpeed',x=>x*2.236936,' mph',val(w?.wind_mph ?? c.wind_speed_10m,' mph'))],
+    ['Gust',obsMetric('windGust',x=>x*2.236936,' mph',val(w?.gust_mph,' mph'))],
+    ['Dew point',obsMetric('dewpoint',x=>x*9/5+32,'°F',val(w?.dewpoint_f,'°F'))],
+    ['Pressure',obsMetric('barometricPressure',x=>x/3386.389,' inHg',val(w?.pressure_in,' inHg'))],
     ['Cloud cover',val(c.cloud_cover,'%')]
   ].forEach(([a,b])=>m.append(metric(a,b)));
   const h=$('hourly');h.replaceChildren();
-  const times=f.hourly.time;let start=times.findIndex(t=>t>=c.time.slice(0,13)+':00');if(start<0)start=0;
-  for(let i=start;i<Math.min(start+24,times.length);i++){const date=new Date(times[i]+'Z');card(h,'hour',[['small',new Intl.DateTimeFormat('en-US',{hour:'numeric',timeZone:'UTC'}).format(date)],['strong',val(Math.round(f.hourly.temperature_2m[i]),'°')],['small',codeText(f.hourly.weather_code[i])],['small',val(f.hourly.precipitation_probability[i],'% rain')]]);const hour=h.lastElementChild;hour.insertBefore(iconNode(f.hourly.weather_code[i],f.hourly.is_day?.[i] !== 0),hour.children[1]);}
+  const hourlySource=data.sources.hourly;
+  const title=document.querySelector('.panel h2');
+  if (title) title.textContent='Next 24 hours · '+hourlySource;
+  function addHour(time, temp, description, chance, symbol, isDay) {
+    card(h,'hour',[['small',time],['strong',val(Math.round(temp),'°')],['small',description],['small',val(chance,'% rain')]]);
+    const hour=h.lastElementChild;
+    const icon=iconNode(0,isDay);
+    icon.textContent=symbol;
+    icon.setAttribute('aria-label',description);
+    hour.insertBefore(icon,hour.children[1]);
+  }
+  if (hourlySource==='NWS') {
+    data.nwsHourly.filter(p=>Date.parse(p.endTime)>Date.now()).slice(0,24).forEach(p=>{
+      const time=new Date(p.startTime).toLocaleTimeString('en-US',{hour:'numeric'});
+      const description=p.shortForecast || 'Variable conditions';
+      addHour(time,p.temperatureUnit==='C'?p.temperature*9/5+32:p.temperature,description,p.probabilityOfPrecipitation?.value ?? null,nwsConditionIcon(description,p.isDaytime),p.isDaytime);
+    });
+  } else if (hourlySource==='WeatherAPI.com') {
+    data.weatherapiHourly.filter(p=>p.time_epoch*1000>=Date.now()-3600000).slice(0,24).forEach(p=>{
+      const description=p.condition?.text || 'Variable conditions';
+      addHour(new Date(p.time_epoch*1000).toLocaleTimeString('en-US',{hour:'numeric'}),p.temp_f,description,p.chance_of_rain ?? null,nwsConditionIcon(description,p.is_day===1),p.is_day===1);
+    });
+  } else {
+    const times=f.hourly.time;let start=times.findIndex(t=>t>=c.time.slice(0,13)+':00');if(start<0)start=0;
+    for(let i=start;i<Math.min(start+24,times.length);i++){
+      const date=new Date(times[i]+'Z');
+      const description=codeText(f.hourly.weather_code[i]);
+      addHour(new Intl.DateTimeFormat('en-US',{hour:'numeric',timeZone:'UTC'}).format(date),f.hourly.temperature_2m[i],description,f.hourly.precipitation_probability[i],weatherIcon(f.hourly.weather_code[i],f.hourly.is_day?.[i]!==0),f.hourly.is_day?.[i]!==0);
+    }
+  }
   const d=$('daily');d.replaceChildren();
   f.daily.time.forEach((date,i)=>{card(d,'day',[['small',date],['strong',Math.round(f.daily.temperature_2m_max[i])+'° / '+Math.round(f.daily.temperature_2m_min[i])+'°'],['span',codeText(f.daily.weather_code[i])],['p',val(f.daily.precipitation_probability_max[i],'% rain')]]);const day=d.lastElementChild;day.insertBefore(iconNode(f.daily.weather_code[i]),day.children[1]);});
   $('station').textContent=obs ? station.station.name+': '+(obs.temperature?.value==null?'Temperature unavailable':(obs.temperature.value*9/5+32).toFixed(1)+'°F')+' · observed '+(obs.timestamp||'unknown time')+(useNws?' · Used for current conditions':' · Not used for current conditions (missing or stale temperature)') : 'No current NWS station observation available for these coordinates.';
