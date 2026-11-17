@@ -23,15 +23,38 @@ async function lookup(query) {
     })).filter(Boolean).slice(0, 8);
   }
   if (!CITY_RE.test(q)) return [];
-  const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
-  url.searchParams.set('name', q);
-  url.searchParams.set('count', '10');
-  url.searchParams.set('language', 'en');
-  url.searchParams.set('countryCode', 'US');
-  const data = await readJson(url);
-  return (data?.results || []).filter(r => r.country_code === 'US').map(r => normalize({
-    id: 'city:' + r.id, name: r.name, region: r.admin1, latitude: r.latitude, longitude: r.longitude
-  })).filter(Boolean).slice(0, 8);
+  // Geocoding matches airports and other named features as well as cities.
+  // Try both common spellings of Saint/St. so searches such as "st george"
+  // can find "Saint George" without showing airport-only results.
+  const names = [q];
+  if (/^st\\.?\\s+/i.test(q)) names.push(q.replace(/^st\\.?\\s+/i, 'Saint '));
+  else if (/^saint\\s+/i.test(q)) names.push(q.replace(/^saint\\s+/i, 'St '));
+  const responses = await Promise.all(names.map(async name => {
+    const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
+    url.searchParams.set('name', name);
+    url.searchParams.set('count', '20');
+    url.searchParams.set('language', 'en');
+    url.searchParams.set('countryCode', 'US');
+    return readJson(url);
+  }));
+  const seen = new Set();
+  const results = [];
+  for (const data of responses) {
+    for (const r of data?.results || []) {
+      if (r.country_code !== 'US') continue;
+      // GeoNames PPL* entries are populated places; AIR* entries are airports.
+      if (r.feature_code && !/^PPL/i.test(r.feature_code)) continue;
+      if (/\\b(?:airport|airfield|airstrip)\\b/i.test(r.name)) continue;
+      const place = normalize({
+        id: 'city:' + r.id, name: r.name, region: r.admin1,
+        latitude: r.latitude, longitude: r.longitude
+      });
+      if (!place || seen.has(place.id)) continue;
+      seen.add(place.id);
+      results.push(place);
+    }
+  }
+  return results.slice(0, 8);
 }
 function queryParam(req) { return typeof req.query.q === 'string' ? req.query.q.trim() : ''; }
 async function searchLocations(req, res) {
