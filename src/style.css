@@ -65,3 +65,10 @@
 
 /* Forecast provider details below the current-conditions source. */
 .source-detail{display:block;margin-top:4px}
+
+/* Equal-height hourly cards with consistently aligned precipitation and wind. */
+.hourly{align-items:stretch}
+.hour{display:flex;flex-direction:column;min-height:255px}
+.hour-description{flex:1 1 auto}
+.hour-precipitation{flex:0 0 auto}
+.hour-wind{flex:0 0 auto;margin-top:12px}
