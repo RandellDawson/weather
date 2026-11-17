@@ -108,3 +108,8 @@
 :root[data-theme="day"] .recent-chip button{background:#eaf2f9;color:#172c42}
 :root[data-theme="day"] .recent-chip button:hover{background:#d4e6f4}
 @media(max-width:650px){.location-search form{flex-wrap:nowrap}.location-input-wrap{min-width:0}.location-search form>button{padding:10px 12px}}
+
+/* Compact recent-location chips to fit five saved locations comfortably. */
+.recent-locations{gap:6px}
+.recent-chip button{padding:5px 8px;font-size:.74rem}
+.recent-chip .recent-remove{padding:5px 7px}
