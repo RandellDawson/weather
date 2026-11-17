@@ -347,6 +347,11 @@ queryInput.addEventListener('input', () => {
     } catch (error) { if (seq === searchSequence) $('location-message').textContent = error.message; }
   }, 300);
 });
+// Dismiss suggestions when interacting outside the search controls.
+// Keep clicks on suggestion buttons working by treating the whole form as inside.
+document.addEventListener('pointerdown', event => {
+  if (!$('location-form').contains(event.target)) clearSuggestions();
+});
 queryInput.addEventListener('keydown', event => {
   if (!suggestions.length) return;
   if (event.key === 'Escape') { clearSuggestions(); return; }
