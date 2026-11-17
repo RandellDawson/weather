@@ -96,6 +96,13 @@ function render(data) {
   } else {
     source.textContent=useWeatherApi ? 'WeatherAPI.com current conditions · ' + (w.last_updated || 'latest') : 'Open-Meteo modeled current conditions · ' + c.time;
   }
+  const hourlySourceLabel=document.createElement('span');
+  hourlySourceLabel.className='source-detail';
+  hourlySourceLabel.textContent='Hourly Forecast: ' + data.sources.hourly;
+  const dailySourceLabel=document.createElement('span');
+  dailySourceLabel.className='source-detail';
+  dailySourceLabel.textContent='Daily Forecast: ' + data.sources.forecast;
+  source.append(hourlySourceLabel,dailySourceLabel);
   const m=$('metrics');m.replaceChildren();
   const obsMetric=(field, convert, unit, fallback) => useNws ? (nwsValue(obs[field]?.value,convert,unit) ?? fallback) : fallback;
   [
@@ -129,9 +136,12 @@ function render(data) {
     const directionText=windDirection ? windDirection+' ' : '';
     const speed=document.createElement('span');
     speed.textContent='Wind: '+directionText+speedText;
-    const gust=document.createElement('span');
-    gust.textContent='Gusts: '+(Number.isFinite(windGust) ? Math.round(windGust)+' mph' : '—');
-    wind.append(speed,gust);
+    wind.append(speed);
+    if (Number.isFinite(windGust)) {
+      const gust=document.createElement('span');
+      gust.textContent='Gusts: '+Math.round(windGust)+' mph';
+      wind.append(gust);
+    }
     hour.append(wind);
   }
   if (hourlySource==='NWS') {
