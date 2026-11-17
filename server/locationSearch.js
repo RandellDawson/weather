@@ -27,8 +27,8 @@ async function lookup(query) {
   // Try both common spellings of Saint/St. so searches such as "st george"
   // can find "Saint George" without showing airport-only results.
   const names = [q];
-  if (/^st\\.?\\s+/i.test(q)) names.push(q.replace(/^st\\.?\\s+/i, 'Saint '));
-  else if (/^saint\\s+/i.test(q)) names.push(q.replace(/^saint\\s+/i, 'St '));
+  if (/^st\.?\s+/i.test(q)) names.push(q.replace(/^st\.?\s+/i, 'Saint '));
+  else if (/^saint\s+/i.test(q)) names.push(q.replace(/^saint\s+/i, 'St '));
   const responses = await Promise.all(names.map(async name => {
     const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
     url.searchParams.set('name', name);
@@ -44,7 +44,7 @@ async function lookup(query) {
       if (r.country_code !== 'US') continue;
       // GeoNames PPL* entries are populated places; AIR* entries are airports.
       if (r.feature_code && !/^PPL/i.test(r.feature_code)) continue;
-      if (/\\b(?:airport|airfield|airstrip)\\b/i.test(r.name)) continue;
+      if (/\b(?:airport|airfield|airstrip)\b/i.test(r.name)) continue;
       const place = normalize({
         id: 'city:' + r.id, name: r.name, region: r.admin1,
         latitude: r.latitude, longitude: r.longitude
