@@ -21,7 +21,13 @@ function functions() {
   });
   vm.runInContext(script.slice(start, end).replace(/function saveRecents\(items\) \{[^\n]*\}/,
     "function saveRecents(items) { localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0,5))); }"), context);
-  // rememberLocation is declared after the DOM-based renderRecents function.\n  // Load that helper separately so the VM tests the actual implementation.\n  const rememberStart = script.indexOf('function rememberLocation(');\n  const rememberEnd = script.indexOf('function clearSuggestions()', rememberStart);\n  assert(rememberStart > end && rememberEnd > rememberStart);\n  vm.runInContext(script.slice(rememberStart, rememberEnd), context);\n  return {context, store, evaluate: expression => vm.runInContext(expression, context)};
+  // rememberLocation is declared after the DOM-based renderRecents function.
+  // Load that helper separately so the VM tests the actual implementation.
+  const rememberStart = script.indexOf('function rememberLocation(');
+  const rememberEnd = script.indexOf('function clearSuggestions()', rememberStart);
+  assert(rememberStart > end && rememberEnd > rememberStart);
+  vm.runInContext(script.slice(rememberStart, rememberEnd), context);
+  return {context, store, evaluate: expression => vm.runInContext(expression, context)};
 }
 const place = (id, name, region, zip) => ({id, name, region, lat:37.1, lon:-113.5, ...(zip ? {zip} : {})});
 
