@@ -13,7 +13,7 @@ npm test
 npm start
 ```
 
-Open http://localhost:3000 and allow geolocation or enter coordinates manually.
+Open http://localhost:3000 and allow browser geolocation when prompted. The app requests location automatically on page load; there are no manual coordinate inputs. Use Retry location if access fails. Browser geolocation requires HTTPS or localhost.
 
 ## Data sources
 
