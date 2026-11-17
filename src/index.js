@@ -101,7 +101,7 @@ function render(data) {
   hourlySourceLabel.textContent='Hourly Forecast: ' + data.sources.hourly;
   const dailySourceLabel=document.createElement('span');
   dailySourceLabel.className='source-detail';
-  dailySourceLabel.textContent='Daily Forecast: ' + data.sources.forecast;
+  dailySourceLabel.textContent='Daily Forecast: ' + (Array.isArray(data.weatherapiDaily) && data.weatherapiDaily.some(day => f.daily.time.slice(0,3).includes(day.date) && Number.isFinite(day.day?.mintemp_f) && Number.isFinite(day.day?.maxtemp_f) && day.day?.condition?.text) ? 'WeatherAPI.com (First 3 Days), Open-Meteo (Remaining Days)' : data.sources.forecast);
   source.append(hourlySourceLabel,dailySourceLabel);
   const m=$('metrics');m.replaceChildren();
   const obsMetric=(field, convert, unit, fallback) => useNws ? (nwsValue(obs[field]?.value,convert,unit) ?? fallback) : fallback;
@@ -167,7 +167,14 @@ function render(data) {
   const dailyWindDirection = degrees => Number.isFinite(degrees)
     ? ['N','NE','E','SE','S','SW','W','NW'][Math.round((((degrees % 360)+360)%360)/45)%8]
     : '—';
+  const weatherApiDays = new Map((data.weatherapiDaily || []).slice(0,3)
+    .filter(item => item?.date && Number.isFinite(item.day?.mintemp_f) && Number.isFinite(item.day?.maxtemp_f) && item.day?.condition?.text)
+    .map(item => [item.date,item]));
   f.daily.time.forEach((date,i) => {
+    const weatherDay = i < 3 ? weatherApiDays.get(date) : null;
+    const weatherDetails = weatherDay?.day;
+    const weatherHours = Array.isArray(weatherDay?.hour) ? weatherDay.hour : [];
+    const weatherGusts = weatherHours.map(hour => hour.gust_mph).filter(Number.isFinite);
     const row=document.createElement('div');
     row.className='day';
     const top=document.createElement('div');
@@ -179,31 +186,39 @@ function render(data) {
     const condition=document.createElement('div');
     condition.className='day-condition';
     const description=document.createElement('span');
-    description.textContent=codeText(f.daily.weather_code[i]);
-    condition.append(iconNode(f.daily.weather_code[i]),description);
+    description.textContent=weatherDetails ? weatherDetails.condition.text : codeText(f.daily.weather_code[i]);
+    if (weatherDetails) {
+      const icon=document.createElement('span');
+      icon.className='weather-icon';
+      icon.setAttribute('role','img');
+      icon.setAttribute('aria-label',description.textContent);
+      icon.textContent=nwsConditionIcon(description.textContent,true);
+      condition.append(icon,description);
+    } else {
+      condition.append(iconNode(f.daily.weather_code[i]),description);
+    }
     const temperatures=document.createElement('strong');
     temperatures.className='day-temperatures';
-    temperatures.textContent=Math.round(f.daily.temperature_2m_min[i])+'° / '+Math.round(f.daily.temperature_2m_max[i])+'°';
+    temperatures.textContent=Math.round(weatherDetails ? weatherDetails.mintemp_f : f.daily.temperature_2m_min[i])+'° / '+Math.round(weatherDetails ? weatherDetails.maxtemp_f : f.daily.temperature_2m_max[i])+'°';
     top.append(dateLabel,condition,temperatures);
     const bottom=document.createElement('div');
     bottom.className='day-details';
     const precipitation=document.createElement('span');
     precipitation.className='day-precipitation';
-    precipitation.textContent='💧 '+val(f.daily.precipitation_probability_max[i],'% Rain');
+    precipitation.textContent='💧 '+val(weatherDetails && Number.isFinite(Number(weatherDetails.daily_chance_of_rain)) ? Number(weatherDetails.daily_chance_of_rain) : f.daily.precipitation_probability_max[i],'% Rain');
     const wind=document.createElement('span');
     wind.className='day-wind';
-    const maxWind=f.daily.wind_speed_10m_max?.[i];
-    const direction=dailyWindDirection(f.daily.wind_direction_10m_dominant?.[i]);
-    wind.textContent='Max Wind: '+direction+' '+(Number.isFinite(maxWind)?Math.round(maxWind)+' mph':'—');
+    const maxWind=weatherDetails ? weatherDetails.maxwind_mph : f.daily.wind_speed_10m_max?.[i];
+    const direction=weatherDetails ? '' : dailyWindDirection(f.daily.wind_direction_10m_dominant?.[i])+' ';
+    wind.textContent='Max Wind: '+direction+(Number.isFinite(maxWind)?Math.round(maxWind)+' mph':'—');
     const gust=document.createElement('span');
     gust.className='day-gust';
-    const maxGust=f.daily.wind_gusts_10m_max?.[i];
+    const maxGust=weatherDetails ? (weatherGusts.length ? Math.max(...weatherGusts) : null) : f.daily.wind_gusts_10m_max?.[i];
     gust.textContent='Max Gusts: '+(Number.isFinite(maxGust)?Math.round(maxGust)+' mph':'—');
     bottom.append(precipitation,wind,gust);
     row.append(top,bottom);
     d.append(row);
   });
-  $('station').textContent=obs ? station.station.name+': '+(obs.temperature?.value==null?'Temperature unavailable':(obs.temperature.value*9/5+32).toFixed(1)+'°F')+' · observed '+(obs.timestamp||'unknown time')+(useNws?' · Used for current conditions':' · Not used for current conditions (missing or stale temperature)') : 'No current NWS station observation available for these coordinates.';
 }
 const REFRESH_MS = 15 * 60 * 1000;
 let lastCoordinates = null;
