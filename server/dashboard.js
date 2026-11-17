@@ -1,14 +1,16 @@
 const { validateCoords } = require('./weather');
 const cache = new Map();
 const TTL = 10 * 60 * 1000;
-const FORECAST_TTL = 60 * 60 * 1000;
-const forecastCache = new Map();
-async function cachedForecast(key, url, forceRefresh = false) {
-  const item = forecastCache.get(key);
+const HOURLY_TTL = 15 * 60 * 1000;
+const DAILY_TTL = 60 * 60 * 1000;
+const hourlyCache = new Map();
+const dailyCache = new Map();
+async function cachedForecast(store, key, url, ttl, forceRefresh = false) {
+  const item = store.get(key);
   if (!forceRefresh && item && item.expires > Date.now()) return item.data;
   const data = await json(url);
-  if (forecastCache.size >= 200) forecastCache.delete(forecastCache.keys().next().value);
-  forecastCache.set(key, { data, expires: Date.now() + FORECAST_TTL });
+  if (store.size >= 200 && !store.has(key)) store.delete(store.keys().next().value);
+  store.set(key, { data, expires: Date.now() + ttl });
   return data;
 }
 async function json(url, headers = {}) {
@@ -36,13 +38,19 @@ async function getDashboard(req, res) {
       hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,relative_humidity_2m',
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset'
     }).forEach(([k,v]) => forecastUrl.searchParams.set(k, String(v)));
+    const hourlyUrl = new URL(forecastUrl);
+    hourlyUrl.searchParams.delete('daily');
+    hourlyUrl.searchParams.set('forecast_days', '2');
+    const dailyUrl = new URL(forecastUrl);
+    dailyUrl.searchParams.delete('hourly');
     const currentUrl = new URL(forecastUrl);
     currentUrl.searchParams.delete('hourly');
     currentUrl.searchParams.delete('daily');
     currentUrl.searchParams.delete('forecast_days');
     currentUrl.searchParams.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m');
-    const [forecastResult, currentResult, nwsResult, weatherApiResult] = await Promise.allSettled([
-      cachedForecast(key, forecastUrl, forceRefresh),
+    const [hourlyResult, dailyResult, currentResult, nwsResult, weatherApiResult] = await Promise.allSettled([
+      cachedForecast(hourlyCache, key, hourlyUrl, HOURLY_TTL, forceRefresh),
+      cachedForecast(dailyCache, key, dailyUrl, DAILY_TTL, forceRefresh),
       json(currentUrl),
       (async () => {
         const headers = { 'User-Agent': 'RandellDawson-weather (weather.randelldawson.com)', Accept: 'application/geo+json' };
@@ -61,11 +69,12 @@ async function getDashboard(req, res) {
         return json(url);
       })()
     ]);
-    if (forecastResult.status !== 'fulfilled') throw forecastResult.reason;
+    if (hourlyResult.status !== 'fulfilled') throw hourlyResult.reason;
+    if (dailyResult.status !== 'fulfilled') throw dailyResult.reason;
     if (currentResult.status !== 'fulfilled') throw currentResult.reason;
     const data = {
       coordinates: { latitude, longitude },
-      forecast: { ...forecastResult.value, current: currentResult.value.current },
+      forecast: { ...dailyResult.value, hourly: hourlyResult.value.hourly, current: currentResult.value.current },
       nws: nwsResult.status === 'fulfilled' ? nwsResult.value : null,
       weatherapi: weatherApiResult.status === 'fulfilled' ? weatherApiResult.value?.current || null : null,
       sources: { forecast: 'Open-Meteo', station: 'NWS', current: process.env.WEATHERAPI_KEY ? 'WeatherAPI.com' : 'Open-Meteo' },
