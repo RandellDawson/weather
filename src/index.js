@@ -372,7 +372,11 @@ $('location-form').addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(searchTimer); searchSequence++;
   const q = queryInput.value.trim();
   if (!q) { $('location-message').textContent = 'Enter a U.S. city or five-digit ZIP code.'; return; }
-  if (selectedSuggestion && q === locationLabel(selectedSuggestion)) { await chooseLocation(selectedSuggestion); return; }
+  // A displayed city/state is a valid selected location, not a new geocoding query.
+  // Resolve it even if focus changes or autocomplete selection state was cleared.
+  const savedPlace = [selectedSuggestion, lastSelectedPlace, ...recentLocations()]
+    .find(place => place && q === locationLabel(place));
+  if (savedPlace) { await chooseLocation(savedPlace); return; }
   if (/^\d+$/.test(q) && !/^\d{5}$/.test(q)) { $('location-message').textContent = 'Enter a five-digit U.S. ZIP code.'; return; }
   if (q.length < 3) { $('location-message').textContent = 'Enter at least three letters of a city name.'; return; }
   try {
