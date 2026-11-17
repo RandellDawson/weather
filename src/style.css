@@ -81,3 +81,30 @@
 /* Resolved city above the current reading. */
 .current-city{font-size:1.1rem;font-weight:650;margin:10px 0 4px;color:inherit}
 :root[data-theme="day"] .current-city{color:#172c42}
+
+/* Search and persistent recent locations */
+.location-search{position:relative;margin:0 0 14px}
+.location-search form{display:flex;align-items:end;gap:10px;margin:0}
+.location-input-wrap{position:relative;flex:1;max-width:420px}
+.location-input-wrap label{display:block;margin-bottom:5px}
+.location-input-wrap input{width:100%;margin:0}
+.location-search form>button{min-height:42px}
+.location-suggestions{position:absolute;top:100%;left:0;right:0;z-index:10;background:#172b45;border:1px solid #4b6484;border-radius:9px;max-height:270px;overflow-y:auto;box-shadow:0 8px 24px #0005}
+.location-suggestions[hidden]{display:none}
+.location-option{display:block;width:100%;border-radius:0;text-align:left;background:transparent;color:#eaf2ff;padding:11px 12px}
+.location-option:hover,.location-option[aria-selected="true"]{background:#315578}
+#location-message{font-size:.85rem;margin:7px 0;min-height:0}
+.recent-locations{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.recent-title{font-size:.8rem;color:#b4c9e2}
+.recent-chip{display:inline-flex;border:1px solid #4b6484;border-radius:9px;overflow:hidden}
+.recent-chip button{background:#1c324e;color:#eaf2ff;border-radius:0;padding:7px 10px;font-size:.8rem}
+.recent-chip button:hover{background:#315578}
+.recent-chip .recent-remove{padding:7px 9px;border-left:1px solid #4b6484}
+:root[data-theme="day"] .location-suggestions{background:#fff;border-color:#9fb6cc;box-shadow:0 8px 24px #183a5733}
+:root[data-theme="day"] .location-option{background:#fff;color:#172c42}
+:root[data-theme="day"] .location-option:hover,:root[data-theme="day"] .location-option[aria-selected="true"]{background:#eaf2f9}
+:root[data-theme="day"] .recent-title{color:#4b6279}
+:root[data-theme="day"] .recent-chip{border-color:#9fb6cc}
+:root[data-theme="day"] .recent-chip button{background:#eaf2f9;color:#172c42}
+:root[data-theme="day"] .recent-chip button:hover{background:#d4e6f4}
+@media(max-width:650px){.location-search form{flex-wrap:nowrap}.location-input-wrap{min-width:0}.location-search form>button{padding:10px 12px}}
