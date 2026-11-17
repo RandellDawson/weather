@@ -33,7 +33,7 @@ const place = (id, name, region, zip) => ({id, name, region, lat:37.1, lon:-113.
 
 test('five recent locations are retained, newest first', () => {
   const {context, evaluate} = functions();
-  for (let i=0;i<6;i++) context.rememberLocation(place('city:'+i, 'Town'+i, 'Utah'));
+  for (let i=0;i<6;i++) context.rememberLocation({ ...place('city:'+i, 'Town'+i, 'Utah'), lat: 37.1 + i * 0.1, lon: -113.5 - i * 0.1 });
   const recent = evaluate('recentLocations()');
   assert.equal(recent.length, 5);
   assert.equal(recent[0].name, 'Town5');
