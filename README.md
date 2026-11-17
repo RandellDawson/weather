@@ -1,39 +1,35 @@
-# Weather
+# Weather dashboard (first-pass redesign)
 
-Standalone Node.js 24 / Express website and weather API for `weather.randelldawson.com`.
+Node.js 24 / Express application for weather.randelldawson.com.
 
-The original design remains in `src/index.html` and `src/style.css`, served as static files. Native browser JavaScript replaces the old Webpack 4 toolchain.
-
-## Local setup
+## Development
 
 ```bash
 nvm use
 npm install
 cp .env.example .env
-# Add OPENWEATHER_API_KEY to .env, without committing secrets.
+# Optional: add WEATHERAPI_KEY=... to .env for current-condition estimates
 npm test
 npm start
 ```
 
-Open http://localhost:3000. The server listens on `127.0.0.1` only.
+Open http://localhost:3000 and allow geolocation or enter coordinates manually.
 
-## Endpoints
+## Data sources
 
-- `/`: weather webpage
-- `/current?lat=37.1&lon=-113.5`: OpenWeather-compatible JSON
-- `/health`: basic health check
+- **WeatherAPI.com (optional)**: current-condition estimate at supplied coordinates, using a server-side `WEATHERAPI_KEY`. The key is never returned to the browser.
+- **Open-Meteo**: modeled current conditions when WeatherAPI is not configured; hourly and 16-day forecasts.
+- **NWS**: latest actual observation from the first station returned for the requested point, within the contiguous United States. Observations may be delayed, unavailable, or differ from conditions at the coordinates.
 
-The site uses browser geolocation only. Visitors must allow location access to receive local weather. The OpenWeather endpoint is configured in the server code and needs no `API_URL` setting.
+`GET /api/dashboard?lat=37.0965&lon=-113.5684` aggregates the sources. Existing `/current` OpenWeather endpoint remains available for compatibility during migration. `/health` is unchanged.
 
-## Security
+The server caches dashboard responses for ten minutes per rounded coordinate pair, limits the cache to 200 entries, and applies the existing request limiter and origin checks. These checks **do not authenticate callers**; a public website can still be scripted against. The provider key remains private, but a public backend cannot guarantee that no one consumes its quota. Add provider request budgeting before enabling WeatherAPI on a high-traffic site.
 
-- CORS access isn't opened to other origins. Cross-origin browser requests with disallowed Origin, Referer, or Sec-Fetch-Site headers are rejected.
-- These checks are *not* authentication. HTTP clients can forge or omit headers. Public API endpoints are still callable from scripts.
-- Shared rate limiting: 60 requests per 15 minutes per client IP for `/current`. Single-process in-memory limiter; upgrade to shared storage if scaling to multiple workers.
-- Keep the OpenWeather key in `.env`. No IP geolocation account or key is required.
-- The application only binds localhost. Put Nginx HTTPS in front of it, and do not expose the Node port.
-- `TRUST_PROXY=1` only with trusted local Nginx forwarding client IP, e.g. `proxy_set_header X-Forwarded-For $remote_addr;`; ensure direct access to the Node port is blocked. No broad untrusted proxy setting.
-- For stronger prevention of automated extraction, use proxy-level WAF / bot control or authentication. A public anonymous website cannot absolutely prevent scraping.
-- The existing weather icons use third-party Glitch URLs, preserved for visual compatibility.
+## First-pass limitations
 
-This branch does not deploy production or remove the legacy API.
+- No NWS alerts or manual station selector yet.
+- No automatic refresh, location favorites, or detailed hourly charts yet.
+- NWS station errors do not prevent the forecast from loading.
+- No live provider integration tests have been run in this PR.
+- Existing production configuration and deployment are unchanged.
+
