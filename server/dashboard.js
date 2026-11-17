@@ -1,6 +1,16 @@
 const { validateCoords } = require('./weather');
 const cache = new Map();
 const TTL = 10 * 60 * 1000;
+const FORECAST_TTL = 60 * 60 * 1000;
+const forecastCache = new Map();
+async function cachedForecast(key, url) {
+  const item = forecastCache.get(key);
+  if (item && item.expires > Date.now()) return item.data;
+  const data = await json(url);
+  if (forecastCache.size >= 200) forecastCache.delete(forecastCache.keys().next().value);
+  forecastCache.set(key, { data, expires: Date.now() + FORECAST_TTL });
+  return data;
+}
 async function json(url, headers = {}) {
   const response = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
   if (!response.ok) throw new Error('Provider HTTP ' + response.status);
@@ -21,12 +31,17 @@ async function getDashboard(req, res) {
     Object.entries({
       latitude, longitude, timezone: 'auto', forecast_days: 16,
       temperature_unit: 'fahrenheit', wind_speed_unit: 'mph', precipitation_unit: 'inch',
-      current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m',
       hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,relative_humidity_2m',
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset'
     }).forEach(([k,v]) => forecastUrl.searchParams.set(k, String(v)));
-    const [forecastResult, nwsResult, weatherApiResult] = await Promise.allSettled([
-      json(forecastUrl),
+    const currentUrl = new URL(forecastUrl);
+    currentUrl.searchParams.delete('hourly');
+    currentUrl.searchParams.delete('daily');
+    currentUrl.searchParams.delete('forecast_days');
+    currentUrl.searchParams.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m');
+    const [forecastResult, currentResult, nwsResult, weatherApiResult] = await Promise.allSettled([
+      cachedForecast(key, forecastUrl),
+      json(currentUrl),
       (async () => {
         const headers = { 'User-Agent': 'RandellDawson-weather (weather.randelldawson.com)', Accept: 'application/geo+json' };
         const point = await json('https://api.weather.gov/points/' + latitude.toFixed(4) + ',' + longitude.toFixed(4), headers);
@@ -45,9 +60,10 @@ async function getDashboard(req, res) {
       })()
     ]);
     if (forecastResult.status !== 'fulfilled') throw forecastResult.reason;
+    if (currentResult.status !== 'fulfilled') throw currentResult.reason;
     const data = {
       coordinates: { latitude, longitude },
-      forecast: forecastResult.value,
+      forecast: { ...forecastResult.value, current: currentResult.value.current },
       nws: nwsResult.status === 'fulfilled' ? nwsResult.value : null,
       weatherapi: weatherApiResult.status === 'fulfilled' ? weatherApiResult.value?.current || null : null,
       sources: { forecast: 'Open-Meteo', station: 'NWS', current: process.env.WEATHERAPI_KEY ? 'WeatherAPI.com' : 'Open-Meteo' },
