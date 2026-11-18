@@ -401,7 +401,31 @@ async function load(lat,lon,selectedPlace = null, requestedRefresh = false) {
   $('status').textContent='Loading weather…';
   const forceRefresh = reloadPending || requestedRefresh;
   reloadPending = false;
-  try{const response=await fetch('/api/dashboard?'+new URLSearchParams({lat,lon,...(forceRefresh?{refresh:'1'}:{})}),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');render(data,selectedPlace);lastCoordinates={lat,lon};lastSelectedPlace=selectedPlace;lastSuccessfulRefresh=Date.now();$('status').textContent='Updated '+new Date(data.fetchedAt).toLocaleTimeString();return true;}
+  try {
+    let data;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch('/api/dashboard?' + new URLSearchParams({lat,lon,...(forceRefresh && attempt === 0 ? {refresh:'1'} : {})}), {cache:'no-store'});
+        data = await response.json();
+        if (!response.ok) {
+          const error = new Error(data.error || 'Request failed');
+          error.retryable = response.status >= 500 || response.status === 429;
+          throw error;
+        }
+        break;
+      } catch (error) {
+        if (attempt || error.retryable === false) throw error;
+        $('status').textContent = 'Weather temporarily unavailable. Retrying…';
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    }
+    render(data,selectedPlace);
+    lastCoordinates={lat,lon};
+    lastSelectedPlace=selectedPlace;
+    lastSuccessfulRefresh=Date.now();
+    $('status').textContent=(data.stale ? 'Showing last available weather · ' : 'Updated ') + new Date(data.fetchedAt).toLocaleTimeString();
+    return true;
+  }
   catch(e){$('status').textContent='Unable to load weather: '+e.message;return false;}
   finally{loading=false;}
 }
