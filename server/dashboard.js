@@ -76,7 +76,10 @@ async function getWeatherApi(latitude, longitude, key, forceRefresh) {
   return {
     ...(forecast.status === 'fulfilled' ? forecast.value : {}),
     current: current.status === 'fulfilled' ? current.value.current : null,
-    location: current.status === 'fulfilled' ? current.value.location : forecast.status === 'fulfilled' ? forecast.value.location : null
+    location: forecast.status === 'fulfilled' || current.status === 'fulfilled' ? {
+      ...(forecast.status === 'fulfilled' ? forecast.value.location : {}),
+      ...(current.status === 'fulfilled' ? current.value.location : {})
+    } : null
   };
 }
 
