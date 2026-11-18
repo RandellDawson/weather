@@ -118,7 +118,7 @@ function validNwsHourly(periods) {
   return future.length >= 24 && future.slice(0,24).every(p => Number.isFinite(p.temperature) && p.shortForecast);
 }
 function validWeatherApiHourly(data) {
-  return Array.isArray(data?.forecast?.forecastday) && data.forecast.forecastday.flatMap(d => d.hour || []).filter(h => Date.parse(h.time_epoch * 1000) >= Date.now()).length >= 24;
+  return Array.isArray(data?.forecast?.forecastday) && data.forecast.forecastday.flatMap(d => d.hour || []).filter(h => Number(h.time_epoch) * 1000 >= Date.now()).length >= 24;
 }
 
 async function getDashboard(req, res) {
