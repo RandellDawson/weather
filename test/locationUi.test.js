@@ -120,5 +120,5 @@ test('ordinary city selection does not force refresh, while recent selection doe
   assert.match(script, /async function chooseLocation\(place, forceRefresh = false\)/);
   assert.match(script, /const success = await load\(place\.lat, place\.lon, place, forceRefresh\)/);
   assert.match(script, /const forceRefresh = reloadPending \|\| requestedRefresh/);
-  assert.match(script, /\(forceRefresh\?\{refresh:'1'\}:\{\}\)/);
+  assert.match(script, /forceRefresh && attempt === 0 \? \{refresh:'1'\} : \{\}/);
 });
