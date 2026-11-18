@@ -1,5 +1,6 @@
 const { validateCoords } = require('./weather');
 const cache = new Map();
+const lastGood = new Map();
 const TTL = 10 * 60 * 1000;
 const HOURLY_TTL = 30 * 60 * 1000;
 const DAILY_TTL = 60 * 60 * 1000;
@@ -8,15 +9,28 @@ const dailyCache = new Map();
 async function cachedForecast(store, key, url, ttl, forceRefresh = false, headers = {}) {
   const item = store.get(key);
   if (!forceRefresh && item && item.expires > Date.now()) return item.data;
-  const data = await json(url, headers);
+  let data;
+  try { data = await json(url, headers); }
+  catch (error) {
+    if (!item?.data) throw error;
+    console.warn('Using previous forecast:', error.message);
+    return item.data;
+  }
   if (store.size >= 200 && !store.has(key)) store.delete(store.keys().next().value);
   store.set(key, { data, expires: Date.now() + ttl });
   return data;
 }
 async function json(url, headers = {}) {
-  const response = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw new Error('Provider HTTP ' + response.status);
-  return response.json();
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+      if (response.ok) return await response.json();
+      lastError = new Error(new URL(url).hostname + ' HTTP ' + response.status);
+      if (response.status < 500 && response.status !== 429) break;
+    } catch (error) { lastError = error; }
+  }
+  throw lastError;
 }
 
 const nwsHeaders = { 'User-Agent': 'RandellDawson-weather (weather.randelldawson.com)', Accept: 'application/geo+json' };
@@ -144,33 +158,61 @@ async function getDashboard(req, res) {
       getNws(latitude, longitude, key, forceRefresh),
       getWeatherApi(latitude, longitude, key, forceRefresh)
     ]);
-    if (hourlyResult.status !== 'fulfilled') throw hourlyResult.reason;
-    if (dailyResult.status !== 'fulfilled') throw dailyResult.reason;
-    if (currentResult.status !== 'fulfilled') throw currentResult.reason;
+    for (const [name, result] of [['hourly', hourlyResult], ['daily', dailyResult], ['current', currentResult]]) {
+      if (result.status === 'rejected') console.warn('Open-Meteo ' + name + ' unavailable:', result.reason.message);
+    }
     const nws = nwsResult.status === 'fulfilled' ? nwsResult.value : null;
     const weatherapi = weatherApiResult.status === 'fulfilled' ? weatherApiResult.value : null;
+    const apiDays = weatherapi?.forecast?.forecastday || [];
+    const daily = dailyResult.status === 'fulfilled' ? dailyResult.value.daily : apiDays.length ? {
+      time: apiDays.map(d => d.date),
+      weather_code: apiDays.map(() => 0),
+      temperature_2m_min: apiDays.map(d => d.day?.mintemp_f),
+      temperature_2m_max: apiDays.map(d => d.day?.maxtemp_f),
+      precipitation_probability_max: apiDays.map(d => Number(d.day?.daily_chance_of_rain ?? 0)),
+      wind_speed_10m_max: apiDays.map(d => d.day?.maxwind_mph),
+      wind_gusts_10m_max: apiDays.map(() => null)
+    } : null;
+    const current = currentResult.status === 'fulfilled' ? currentResult.value.current : {
+      time: new Date().toISOString(), is_day: 1, weather_code: 0,
+      temperature_2m: weatherapi?.current?.temp_f ?? null,
+      apparent_temperature: weatherapi?.current?.feelslike_f ?? null,
+      relative_humidity_2m: weatherapi?.current?.humidity ?? null,
+      wind_speed_10m: weatherapi?.current?.wind_mph ?? null,
+      wind_gusts_10m: weatherapi?.current?.gust_mph ?? null,
+      cloud_cover: weatherapi?.current?.cloud ?? null
+    };
+    const hourly = hourlyResult.status === 'fulfilled' ? hourlyResult.value.hourly : {time: [], temperature_2m: [], weather_code: [], precipitation_probability: []};
+    if (!daily || (currentResult.status !== 'fulfilled' && !usableObservation(nws?.selected?.observation) && !Number.isFinite(weatherapi?.current?.temp_f)) ||
+      (hourlyResult.status !== 'fulfilled' && !validNwsHourly(nws?.hourly) && !validWeatherApiHourly(weatherapi))) {
+      throw new Error('No usable provider data for every dashboard section');
+    }
     const currentSource = usableObservation(nws?.selected?.observation) ? 'NWS' : Number.isFinite(weatherapi?.current?.temp_f) ? 'WeatherAPI.com' : 'Open-Meteo';
     const hourlySource = validNwsHourly(nws?.hourly) ? 'NWS' : validWeatherApiHourly(weatherapi) ? 'WeatherAPI.com' : 'Open-Meteo';
     const censusPlace = await getCensusPlace(latitude, longitude, key);
     const data = {
       coordinates: { latitude, longitude },
-      forecast: { ...dailyResult.value, hourly: hourlyResult.value.hourly, current: currentResult.value.current },
+      forecast: { ...(dailyResult.status === 'fulfilled' ? dailyResult.value : hourlyResult.status === 'fulfilled' ? hourlyResult.value : {}), daily, hourly, current },
       nws: nws?.selected || null,
       nwsHourly: hourlySource === 'NWS' ? nws.hourly : null,
       weatherapi: weatherapi?.current || null,
       location: censusPlace ? { city: censusPlace.city, region: weatherapi?.location?.region || null } : weatherapi?.location ? { city: weatherapi.location.name, region: weatherapi.location.region } : null,
       weatherapiHourly: hourlySource === 'WeatherAPI.com' ? weatherapi.forecast.forecastday.flatMap(d => d.hour || []) : null,
       weatherapiDaily: Array.isArray(weatherapi?.forecast?.forecastday) ? weatherapi.forecast.forecastday : [],
-      sources: { forecast: 'Open-Meteo', hourly: hourlySource, station: 'NWS', current: currentSource },
+      sources: { forecast: dailyResult.status === 'fulfilled' ? 'Open-Meteo' : 'WeatherAPI.com', hourly: hourlySource, station: 'NWS', current: currentSource },
       fetchedAt: new Date().toISOString()
     };
     // Bound cache memory in the single-process deployment.
     if (cache.size >= 200) cache.delete(cache.keys().next().value);
     cache.set(key, { expires: Date.now() + TTL, data });
+    if (lastGood.size >= 200) lastGood.delete(lastGood.keys().next().value);
+    lastGood.set(key, data);
     res.set('Cache-Control', 'private, max-age=120');
     return res.json(data);
   } catch (error) {
     console.error('Dashboard weather error:', error.message);
+    const previous = lastGood.get(key);
+    if (previous) { res.set('Cache-Control', 'no-store'); return res.json({...previous, stale: true}); }
     return res.status(502).json({ error: 'Weather services temporarily unavailable' });
   }
 }
