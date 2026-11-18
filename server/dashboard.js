@@ -174,8 +174,8 @@ async function getDashboard(req, res) {
       wind_gusts_10m_max: apiDays.map(() => null)
     } : null;
     const current = currentResult.status === 'fulfilled' ? currentResult.value.current : {
-      time: new Date().toISOString(), is_day: 1, weather_code: 0,
-      temperature_2m: weatherapi?.current?.temp_f ?? null,
+      time: new Date().toISOString(), is_day: weatherapi?.current?.is_day ?? 1, weather_code: 0,
+      temperature_2m: weatherapi?.current?.temp_f ?? (usableObservation(nws?.selected?.observation) ? nws.selected.observation.temperature.value * 9 / 5 + 32 : null),
       apparent_temperature: weatherapi?.current?.feelslike_f ?? null,
       relative_humidity_2m: weatherapi?.current?.humidity ?? null,
       wind_speed_10m: weatherapi?.current?.wind_mph ?? null,
@@ -183,7 +183,7 @@ async function getDashboard(req, res) {
       cloud_cover: weatherapi?.current?.cloud ?? null
     };
     const hourly = hourlyResult.status === 'fulfilled' ? hourlyResult.value.hourly : {time: [], temperature_2m: [], weather_code: [], precipitation_probability: []};
-    if (!daily || (currentResult.status !== 'fulfilled' && !usableObservation(nws?.selected?.observation) && !Number.isFinite(weatherapi?.current?.temp_f)) ||
+    if (!daily?.time?.length || (currentResult.status !== 'fulfilled' && !usableObservation(nws?.selected?.observation) && !Number.isFinite(weatherapi?.current?.temp_f)) ||
       (hourlyResult.status !== 'fulfilled' && !validNwsHourly(nws?.hourly) && !validWeatherApiHourly(weatherapi))) {
       throw new Error('No usable provider data for every dashboard section');
     }
@@ -192,7 +192,7 @@ async function getDashboard(req, res) {
     const censusPlace = await getCensusPlace(latitude, longitude, key);
     const data = {
       coordinates: { latitude, longitude },
-      forecast: { ...(dailyResult.status === 'fulfilled' ? dailyResult.value : hourlyResult.status === 'fulfilled' ? hourlyResult.value : {}), daily, hourly, current },
+      forecast: { ...(dailyResult.status === 'fulfilled' ? dailyResult.value : hourlyResult.status === 'fulfilled' ? hourlyResult.value : {}), timezone: dailyResult.status === 'fulfilled' ? dailyResult.value.timezone : hourlyResult.status === 'fulfilled' ? hourlyResult.value.timezone : weatherapi?.location?.tz_id || 'UTC', daily, hourly, current },
       nws: nws?.selected || null,
       nwsHourly: hourlySource === 'NWS' ? nws.hourly : null,
       weatherapi: weatherapi?.current || null,
