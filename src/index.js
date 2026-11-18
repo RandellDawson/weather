@@ -107,12 +107,12 @@ function render(data, selectedPlace = null) {
   const weatherApiUsed = Array.isArray(data.weatherapiDaily) && data.weatherapiDaily.some(day => f.daily.time.slice(0,3).includes(day.date) && Number.isFinite(day.day?.mintemp_f) && Number.isFinite(day.day?.maxtemp_f) && day.day?.condition?.text);
   dailySourceLabel.textContent='Daily Forecast: ';
   if (weatherApiUsed) {
-    dailySourceLabel.append('First 3 Days Powered by ');
+    dailySourceLabel.append(f.daily.time.length <= 3 ? 'Daily Forecast Powered by ' : 'First 3 Days Powered by ');
     const attribution=document.createElement('a');
     attribution.href='https://www.weatherapi.com/';
     attribution.title='Weather API';
     attribution.textContent='WeatherAPI.com';
-    dailySourceLabel.append(attribution, ', Remaining Days: Open-Meteo');
+    dailySourceLabel.append(attribution); if (f.daily.time.length > 3) dailySourceLabel.append(', Remaining Days: Open-Meteo');
   } else {
     dailySourceLabel.append(data.sources.forecast);
   }
